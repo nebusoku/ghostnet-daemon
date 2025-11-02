@@ -1,0 +1,13 @@
+.env
+/etc/ghostnet/ghostnet-bot.env
+__pycache__/
+*.pyc
+.venv/
+node_modules/
+dist/
+volumes/
+qdrant/
+ollama/
+*.log
+.DS_Store
+Thumbs.db

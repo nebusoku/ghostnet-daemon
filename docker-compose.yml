@@ -1,0 +1,27 @@
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: unless-stopped
+    ports: [ "11434:11434" ]
+    volumes: [ "ollama:/root/.ollama" ]
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant
+    restart: unless-stopped
+    ports: [ "6333:6333", "6334:6334" ]
+    volumes: [ "qdrant:/qdrant/storage" ]
+
+  api:
+    build: ./api
+    container_name: ai-backend-api
+    restart: unless-stopped
+    env_file: .env
+    depends_on: [ ollama, qdrant ]
+    ports: [ "8000:8000" ]
+    volumes: [ "./api:/app" ]
+
+volumes:
+  ollama:
+  qdrant:
