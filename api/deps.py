@@ -1,7 +1,7 @@
 from fastapi import Header, HTTPException
 import httpx
 from qdrant_client import QdrantClient
-from settings import settings
+from .settings import settings
 async def api_key_auth(authorization: str = Header(default="")):
     if not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing bearer token")
