@@ -1,0 +1,26 @@
+[Unit]
+Description=GhostNet Daemon Discord Bot
+After=network-online.target ghostnet-api.service
+Wants=network-online.target
+
+[Service]
+# Adjust this user/group to match your deployment user
+User=ghostnet
+Group=ghostnet
+
+# Adjust this to your install path
+WorkingDirectory=/opt/ghostnet-daemon
+
+# Env file on the host (contains DISCORD_TOKEN, GHOSTNET_API_KEY, etc.)
+EnvironmentFile=/etc/default/ghostnet-bot
+
+# Entry point for the bot (bot/bot.py)
+ExecStart=/opt/ghostnet-daemon/.venv/bin/python bot/bot.py
+
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

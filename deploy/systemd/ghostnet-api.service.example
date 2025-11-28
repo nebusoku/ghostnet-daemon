@@ -1,0 +1,26 @@
+[Unit]
+Description=GhostNet Daemon API (FastAPI / Ollama backend)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+# Adjust this user/group to match your deployment user
+User=ghostnet
+Group=ghostnet
+
+# Adjust this to your install path (for you it's /home/jfitzgerald/ghostnet-daemon)
+WorkingDirectory=/opt/ghostnet-daemon
+
+# Env file on the host (contains API_KEY etc., not committed to git)
+EnvironmentFile=/etc/default/ghostnet-api
+
+# ASGI app path; api/app.py -> api.app:app
+ExecStart=/opt/ghostnet-daemon/.venv/bin/uvicorn api.app:app --host 0.0.0.0 --port 8001
+
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

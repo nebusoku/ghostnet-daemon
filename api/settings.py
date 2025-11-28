@@ -11,4 +11,5 @@ class Settings(BaseModel):
     top_k: int = int(os.getenv("RETRIEVAL_TOP_K", 2))
     chunk_size: int = int(os.getenv("CHUNK_SIZE", 1000))
     chunk_overlap: int = int(os.getenv("CHUNK_OVERLAP", 150))
+    qdrant_collection: str = "ghostnet-daemon"
 settings = Settings()
