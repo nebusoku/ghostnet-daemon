@@ -1,19 +1,16 @@
 # bot/bot.py
 import discord
 from discord.ext import tasks
-
-from typing import Optional
-
-print("🔥 GhostNet bot.py loaded and executing…", flush=True)
-
 from discord import app_commands
+import requests
 
-from config import DISCORD_TOKEN, PRIMARY_GUILD_ID, BACKEND_URL
+from config import DISCORD_TOKEN, PRIMARY_GUILD_ID, BACKEND_URL, get_headers
 from helpers import check_health, check_deep_health, sync_player
 from channels import get_servercontrol_channel, get_heartbeat_channel
 from presence import update_presence_from_health
 from commands import register_gn_commands
 
+print("🔥 GhostNet bot.py loaded and executing…", flush=True)
 
 # -------------------------------------------------
 # Discord client setup
@@ -118,6 +115,7 @@ async def on_message(message: discord.Message):
     if message.author.bot:
         return
 
+    # Keep player record synced
     sync_player(message.author)
 
     content = message.content.strip()
@@ -127,8 +125,7 @@ async def on_message(message: discord.Message):
         ch = await get_servercontrol_channel(client)
         if ch is None:
             await message.channel.send(
-                "⚠️ Cannot find #servercontrol "
-                f"(ID={None}, name='servercontrol')"
+                "⚠️ Cannot find #servercontrol (ID=None, name='servercontrol')"
             )
             return
 
@@ -159,8 +156,7 @@ async def on_message(message: discord.Message):
         ch = await get_servercontrol_channel(client)
         if ch is None:
             await message.channel.send(
-                "⚠️ Cannot find #servercontrol "
-                f"(ID={None}, name='servercontrol')"
+                "⚠️ Cannot find #servercontrol (ID=None, name='servercontrol')"
             )
             return
 
@@ -220,9 +216,6 @@ async def on_message(message: discord.Message):
 
         query = parts[1].strip()
 
-        from config import get_headers  # local import
-        import requests
-
         payload = {
             "query": query,
             "top_k": 3,
@@ -260,10 +253,28 @@ async def on_message(message: discord.Message):
         return
 
     # ----- NORMAL CHAT FLOW -----
-    from config import get_headers  # local import
-    import requests
+    # Look up player to get mature_ok and feed as a system hint
+    mature_hint = "SYSTEM: player_mature_ok=false"
+    try:
+        resp = requests.get(
+            f"{BACKEND_URL}/players/{message.author.id}",
+            headers=get_headers(),
+            timeout=5,
+        )
+        if resp.status_code == 200:
+            p = resp.json()
+            if p.get("mature_ok"):
+                mature_hint = "SYSTEM: player_mature_ok=true"
+    except Exception:
+        # if lookup fails, default stays "false"
+        pass
 
-    payload = {"messages": [{"role": "user", "content": message.content}]}
+    payload = {
+        "system": mature_hint,
+        "messages": [
+            {"role": "user", "content": message.content}
+        ],
+    }
 
     try:
         resp = requests.post(
@@ -275,6 +286,13 @@ async def on_message(message: discord.Message):
         resp.raise_for_status()
         data = resp.json()
         reply_text = data.get("content") or str(data)
+
+    except requests.exceptions.ReadTimeout:
+        reply_text = (
+            "System Log: local mesh channel stalled while querying the Overworld Nexus core. "
+            "This echo timed out before a clean response came back. "
+            "Try again with a tighter query or after the cores settle."
+        )
     except Exception as e:
         reply_text = f"GhostNet backend error: {e}"
 

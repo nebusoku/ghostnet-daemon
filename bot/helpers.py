@@ -25,6 +25,16 @@ def sync_player(member: discord.Member) -> None:
     except Exception:
         avatar_url = None
 
+# Detect Carl-bot / server role for adult content opt-in
+    mature_ok = False
+    try:
+        for role in getattr(member, "roles", []):
+            if role.name == MATURE_ROLE_NAME:
+                mature_ok = True
+                break
+    except Exception:
+        mature_ok = False
+
     payload = {
         "discord_id": str(member.id),
         "primary_handle": primary_handle or display_name or str(member.id),
@@ -32,6 +42,7 @@ def sync_player(member: discord.Member) -> None:
         "avatar_url": avatar_url,
         "is_npc": False,
         "aliases": [],
+        "mature_ok": mature_ok,
     }
 
     try:

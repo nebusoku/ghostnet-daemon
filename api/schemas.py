@@ -71,6 +71,7 @@ class PlayerBase(BaseModel):
     avatar_url: Optional[str] = None
     is_npc: bool = False
     aliases: List[str] = []
+    mature_ok: bool = False
 
 
 class PlayerCreate(PlayerBase):
@@ -85,6 +86,7 @@ class PlayerUpdate(BaseModel):
     avatar_url: Optional[str] = None
     is_npc: Optional[bool] = None
     aliases: Optional[List[str]] = None
+    mature_ok: Optional[bool] = None
 
 
 class PlayerOut(PlayerBase):

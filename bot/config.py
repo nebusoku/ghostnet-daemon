@@ -20,6 +20,8 @@ HEARTBEAT_CHANNEL_NAME = os.getenv("HEARTBEAT_CHANNEL_NAME", "heartbeat")
 # Guild for fast slash-command sync
 PRIMARY_GUILD_ID = os.getenv("PRIMARY_GUILD_ID")
 
+# Mature Data Tracking
+MATURE_ROLE_NAME = os.getenv("MATURE_ROLE_NAME", "18plus")
 
 if not DISCORD_TOKEN:
     raise RuntimeError("DISCORD_TOKEN is not set in environment or .env")

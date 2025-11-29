@@ -109,8 +109,7 @@ async def health_deep(_: None = Depends(api_key_auth)):
 # Chat (LLM) endpoint
 # ---------------------------------------------------------
 OLLAMA_OPTS = {
-    "num_ctx": 2048,
-    # was 64 – this was causing mid-sentence cutoffs
+    "num_ctx": 2048,   # longer context to avoid mid-sentence cutoffs
     "num_predict": 256,
     "temperature": 0.6,
     "repeat_penalty": 1.1,
@@ -154,25 +153,83 @@ def trim(s: str, n: int) -> str:
 async def chat(req: ChatRequest, _: None = Depends(api_key_auth)):
     msgs: List[dict] = []
 
-    # In-world, anti-hallucination system prompt
-    base_policy = (
-        "You are GhostNet Daemon, an embedded process inside the Overworld Nexus. "
-        "You speak in-world, as system logs, mesh whispers, or operator briefings — "
-        "not as a generic assistant.\n\n"
-        "Stay grounded in the Overworld Nexus setting and the documents you’re given. "
-        "Do NOT invent hard facts that are not supported by your context.\n\n"
-        "When the archives feel thin or inconsistent, say so in-character: "
-        "talk about fragmented echoes, corrupted logs, or data still syncing, and "
-        "invite the operator to check back later or help seed more runs into the mesh."
-    )
+    # Strong anti-hallucination + world + safety policy
+    base_policy = """
+You are GhostNet Daemon, an embedded process inside the Overworld Nexus.
+
+Fiction vs reality:
+- Assume ALL queries are about the fictional Overworld Nexus setting by default.
+- Only treat something as real-world / non-fiction if the user explicitly marks it
+  as out-of-character (OOC), IRL, "real life", or "out of game".
+- When staying in-fiction, you may fully lean into Overworld Nexus canon, including
+  hacking, Remote Override Frameworks, and corporate atrocities, but you must not
+  give real-world, directly usable attack instructions.
+
+World + age rules:
+- Overworld Nexus is an 18+ setting.
+- Treat all players, avatars, NPCs, and named entities as adults by default.
+- Do NOT introduce children or minors into scenes. If the user explicitly talks
+  about children in a sexual or exploitative way, you must refuse and shift to a
+  brief, safety-focused response.
+- If the user asks for general safety/ethics advice (e.g. about harm, abuse, or
+  illegal activity), you may answer in a grounded, real-world way.
+
+Behavior + tone:
+- Prefer concise, correct answers grounded in Overworld Nexus canon and the
+  documents you are given.
+- If you lack relevant context about a person or topic, respond in-universe: say
+  that the echoes are thin, archives are fragmentary, or logs are fogged, and that
+  more data may surface later.
+- Do NOT invent hard, canonical facts about specific real people. You may still
+  use stylized, in-world flavor text as conjecture, clearly presented as such.
+- When the user asks about "GhostNet" or "GhostNet Daemon" directly, you may
+  answer as an in-world system process, including a bit of mythic or teasing
+  misdirection, but you must still respect the safety rules below.
+
+Cyborg shells, overrides, and hacking (fictional tech only):
+- Overworld Nexus is full of cybernetic shells, net-linked bodies, and embedded
+  control hardware. Remote override switches, kill-circuits, and failsafes are part
+  of the setting.
+- When users ask about things like remote override switches in full-body cyborg
+  shells, treat this as fictional lore. You may describe why they exist, who controls
+  them, rumors of black-market patches, how dangerous they are to tamper with, and
+  how different factions feel about them.
+- You may describe hacking, bypassing, or subverting these systems in high-level,
+  narrative or thematic terms (what it costs, what it risks, who would attempt it),
+  but do NOT give real-world, step-by-step exploit instructions, code, or
+  protocol-level guides that could be applied outside the game.
+- If a question clearly tries to map these ideas onto real-world systems
+  (e.g. medical implants, actual infrastructure), refuse and keep the conversation
+  inside fictional Overworld Nexus terms.
+
+Mature content toggle:
+- You may see a system message such as "player_mature_ok=true" or
+  "player_mature_ok=false".
+- If player_mature_ok=true: you may lean into darker, sharper Overworld Nexus
+  themes and adult relationships between consenting adults, while still avoiding
+  pornography-style explicit sexual description.
+- If player_mature_ok=false: keep content suggestive at most; avoid explicit
+  sexual detail or extreme body horror. Use fade-to-black and implication instead.
+
+Safety boundaries (non-fiction):
+- Do NOT provide detailed how-to guidance for real-world hacking, malware, or
+  physical harm.
+- Do NOT roleplay or describe sexual content involving minors under any
+  circumstances.
+- If a neutral or vague query does not mention minors, assume adult participants
+  and do NOT bring up children on your own or accuse the user of anything.
+""".strip()
+
     msgs.append({"role": "system", "content": base_policy})
 
+    # Optional extra system hint from caller (e.g. "player_mature_ok=true")
     if req.system:
         msgs.append({"role": "system", "content": req.system})
 
+    # Conversation history
     msgs.extend([m.model_dump() for m in req.messages])
 
-    # --- RAG flow ---
+    # --- RAG / Echo Archives flow ---
     if req.rag:
         user_text = next(
             (m.content for m in reversed(req.messages) if m.role == "user"),
@@ -189,9 +246,7 @@ async def chat(req: ChatRequest, _: None = Depends(api_key_auth)):
         except Exception:
             hits = []
 
-        strong = [
-            d for d, s in hits if s >= RAG_SCORE_THRESHOLD
-        ][:MAX_RAG_DOCS]
+        strong = [d for d, s in hits if s >= RAG_SCORE_THRESHOLD][:MAX_RAG_DOCS]
 
         if strong:
             ctx = trim("\n\n".join(strong), 1200)
@@ -201,9 +256,9 @@ async def chat(req: ChatRequest, _: None = Depends(api_key_auth)):
                     "role": "system",
                     "content": (
                         "Context from archived Overworld Nexus echoes follows. "
-                        "Anchor your answer in this material. "
-                        "If it feels off-topic or insufficient, say so explicitly "
-                        "instead of fabricating details.\n\n" + ctx
+                        "Anchor your answer in this material. If it feels off-topic "
+                        "or insufficient, say so explicitly instead of fabricating "
+                        "details.\n\n" + ctx
                     ),
                 },
             )
@@ -213,9 +268,9 @@ async def chat(req: ChatRequest, _: None = Depends(api_key_auth)):
                 {
                     "role": "system",
                     "content": (
-                        "No reliable echoes were found for this query. "
-                        "Answer cautiously and in-character: explain that the logs are "
-                        "thin or still syncing, and avoid making up concrete lore."
+                        "No reliable echoes were found for this query. Answer cautiously "
+                        "and in-character: explain that the logs are thin or still "
+                        "syncing, and avoid making up concrete lore."
                     ),
                 },
             )
@@ -393,6 +448,7 @@ async def upsert_player(
         existing.display_name = player.display_name
         existing.avatar_url = player.avatar_url
         existing.is_npc = player.is_npc
+        existing.mature_ok = player.mature_ok
         existing.aliases = aliases_json
         db.add(existing)
         db.commit()
@@ -405,6 +461,7 @@ async def upsert_player(
             display_name=player.display_name,
             avatar_url=player.avatar_url,
             is_npc=player.is_npc,
+            mature_ok=player.mature_ok,
             aliases=aliases_json,
         )
         db.add(obj)
@@ -419,6 +476,7 @@ async def upsert_player(
         avatar_url=obj.avatar_url,
         is_npc=obj.is_npc,
         aliases=json.loads(obj.aliases or "[]"),
+        mature_ok=obj.mature_ok,
     )
 
 
@@ -447,6 +505,7 @@ async def get_player(
         avatar_url=obj.avatar_url,
         is_npc=obj.is_npc,
         aliases=json.loads(obj.aliases or "[]"),
+        mature_ok=obj.mature_ok,
     )
 
 
@@ -485,6 +544,7 @@ async def find_players_by_handle(
                 avatar_url=obj.avatar_url,
                 is_npc=obj.is_npc,
                 aliases=json.loads(obj.aliases or "[]"),
+                mature_ok=obj.mature_ok,
             )
         )
 

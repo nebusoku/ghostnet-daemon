@@ -112,6 +112,9 @@ class Player(Base):
     # NPC / human flag
     is_npc = Column(Boolean, nullable=False, default=False)
 
+    # Adult-content preference (opt-in)
+    mature_ok = Column(Boolean, nullable=False, default=False)
+
     # JSON-encoded list of alias strings (Tupperbox names, RP aliases, etc.)
     aliases = Column(Text, nullable=False, default="[]")
 
