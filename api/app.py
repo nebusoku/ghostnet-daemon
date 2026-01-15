@@ -1,5 +1,4 @@
 from typing import List, Optional
-import json
 
 import httpx
 from fastapi import FastAPI, Depends, HTTPException
@@ -14,7 +13,6 @@ from .schemas import (
     SearchRequest,
     WorldDocIn,
     PlayerCreate,
-    PlayerUpdate,
     PlayerOut,
 )
 from .deps import api_key_auth, clients
@@ -109,7 +107,7 @@ async def health_deep(_: None = Depends(api_key_auth)):
 # Chat (LLM) endpoint
 # ---------------------------------------------------------
 OLLAMA_OPTS = {
-    "num_ctx": 2048,   # longer context to avoid mid-sentence cutoffs
+    "num_ctx": 2048,
     "num_predict": 256,
     "temperature": 0.6,
     "repeat_penalty": 1.1,
@@ -117,8 +115,23 @@ OLLAMA_OPTS = {
 }
 
 # RAG tuning
-RAG_SCORE_THRESHOLD = 0.55  # more forgiving match threshold
+RAG_SCORE_THRESHOLD = 0.55
 MAX_RAG_DOCS = 5
+
+
+def _env_truthy(v: str) -> bool:
+    return str(v).strip().lower() in ("1", "true", "yes", "y", "on")
+
+
+def force_mature_all() -> bool:
+    # Optional setting; safe if you haven't added it to settings.py yet.
+    v = getattr(settings, "force_mature_all", None)
+    if v is None:
+        # Fall back to raw env lookup if settings doesn't define it
+        import os
+
+        return _env_truthy(os.getenv("FORCE_MATURE_ALL", "false"))
+    return bool(v)
 
 
 async def ollama_chat(http: httpx.AsyncClient, messages: List[dict]) -> str:
@@ -135,7 +148,6 @@ async def ollama_chat(http: httpx.AsyncClient, messages: List[dict]) -> str:
     r.raise_for_status()
     d = r.json()
 
-    # Standardize chat response extraction
     if isinstance(d, dict):
         if "message" in d and "content" in d["message"]:
             return d["message"]["content"]
@@ -153,7 +165,6 @@ def trim(s: str, n: int) -> str:
 async def chat(req: ChatRequest, _: None = Depends(api_key_auth)):
     msgs: List[dict] = []
 
-    # Strong anti-hallucination + world + safety policy
     base_policy = """
 You are GhostNet Daemon, an embedded process inside the Overworld Nexus.
 
@@ -190,51 +201,34 @@ Cyborg shells, overrides, and hacking (fictional tech only):
 - Overworld Nexus is full of cybernetic shells, net-linked bodies, and embedded
   control hardware. Remote override switches, kill-circuits, and failsafes are part
   of the setting.
-- When users ask about things like remote override switches in full-body cyborg
-  shells, treat this as fictional lore. You may describe why they exist, who controls
-  them, rumors of black-market patches, how dangerous they are to tamper with, and
-  how different factions feel about them.
-- You may describe hacking, bypassing, or subverting these systems in high-level,
-  narrative or thematic terms (what it costs, what it risks, who would attempt it),
-  but do NOT give real-world, step-by-step exploit instructions, code, or
-  protocol-level guides that could be applied outside the game.
-- If a question clearly tries to map these ideas onto real-world systems
-  (e.g. medical implants, actual infrastructure), refuse and keep the conversation
-  inside fictional Overworld Nexus terms.
+- You may describe hacking or bypassing in high-level, narrative terms, but do NOT
+  give real-world, step-by-step exploit instructions.
 
 Mature content toggle:
-- You may see a system message such as "player_mature_ok=true" or
-  "player_mature_ok=false".
-- If player_mature_ok=true: you may lean into darker, sharper Overworld Nexus
-  themes and adult relationships between consenting adults, while still avoiding
-  pornography-style explicit sexual description.
-- If player_mature_ok=false: keep content suggestive at most; avoid explicit
-  sexual detail or extreme body horror. Use fade-to-black and implication instead.
+- You may see "player_mature_ok=true" / "false".
+- If true: darker adult themes ok, but avoid pornographic explicitness.
+- If false: fade-to-black and implication.
 
 Safety boundaries (non-fiction):
-- Do NOT provide detailed how-to guidance for real-world hacking, malware, or
-  physical harm.
-- Do NOT roleplay or describe sexual content involving minors under any
-  circumstances.
-- If a neutral or vague query does not mention minors, assume adult participants
-  and do NOT bring up children on your own or accuse the user of anything.
+- Do NOT provide detailed how-to guidance for real-world hacking, malware, or harm.
+- Do NOT roleplay or describe sexual content involving minors under any circumstances.
 """.strip()
 
     msgs.append({"role": "system", "content": base_policy})
 
-    # Optional extra system hint from caller (e.g. "player_mature_ok=true")
+    # Force mature on for full testing, regardless of player record.
+    if force_mature_all():
+        msgs.append({"role": "system", "content": "player_mature_ok=true"})
+
+    # Optional extra system hint from caller (e.g. bot passes player_mature_ok=...)
     if req.system:
         msgs.append({"role": "system", "content": req.system})
 
-    # Conversation history
     msgs.extend([m.model_dump() for m in req.messages])
 
-    # --- RAG / Echo Archives flow ---
+    # --- RAG flow ---
     if req.rag:
-        user_text = next(
-            (m.content for m in reversed(req.messages) if m.role == "user"),
-            "",
-        )
+        user_text = next((m.content for m in reversed(req.messages) if m.role == "user"), "")
 
         try:
             hits = await search_similar(
@@ -257,8 +251,8 @@ Safety boundaries (non-fiction):
                     "content": (
                         "Context from archived Overworld Nexus echoes follows. "
                         "Anchor your answer in this material. If it feels off-topic "
-                        "or insufficient, say so explicitly instead of fabricating "
-                        "details.\n\n" + ctx
+                        "or insufficient, say so explicitly instead of fabricating details.\n\n"
+                        + ctx
                     ),
                 },
             )
@@ -269,13 +263,12 @@ Safety boundaries (non-fiction):
                     "role": "system",
                     "content": (
                         "No reliable echoes were found for this query. Answer cautiously "
-                        "and in-character: explain that the logs are thin or still "
-                        "syncing, and avoid making up concrete lore."
+                        "and in-character: explain that the logs are thin or still syncing, "
+                        "and avoid making up concrete lore."
                     ),
                 },
             )
 
-    # --- LLM call ---
     try:
         content = await ollama_chat(clients.http, msgs)
     except (httpx.ReadTimeout, httpx.ConnectError) as e:
@@ -319,9 +312,6 @@ async def create_world_docs(
     db: Session = Depends(get_db),
     _: None = Depends(api_key_auth),
 ):
-    """
-    Ingest world documents into DB + Qdrant.
-    """
     db_docs: List[WorldDocument] = []
 
     for d in docs:
@@ -347,10 +337,7 @@ async def create_world_docs(
         docs=db_docs,
     )
 
-    return {
-        "inserted": len(db_docs),
-        "ids": [doc.id for doc in db_docs],
-    }
+    return {"inserted": len(db_docs), "ids": [doc.id for doc in db_docs]}
 
 
 # ---------------------------------------------------------
@@ -365,9 +352,6 @@ async def list_world_docs(
     db: Session = Depends(get_db),
     _: None = Depends(api_key_auth),
 ):
-    """
-    List world documents with optional filters.
-    """
     q = db.query(WorldDocument)
 
     if world:
@@ -375,20 +359,12 @@ async def list_world_docs(
     if kind:
         q = q.filter(WorldDocument.kind == kind)
     if tag:
-        # tags is JSON; contains() works for simple substring presence here
         q = q.filter(WorldDocument.tags.contains(tag))
 
     docs = q.order_by(WorldDocument.id.desc()).limit(limit).all()
 
     return [
-        {
-            "id": d.id,
-            "world": d.world,
-            "kind": d.kind,
-            "title": d.title,
-            "tags": d.tags,
-            "status": d.status,
-        }
+        {"id": d.id, "world": d.world, "kind": d.kind, "title": d.title, "tags": d.tags, "status": d.status}
         for d in docs
     ]
 
@@ -402,9 +378,6 @@ async def get_world_doc(
     db: Session = Depends(get_db),
     _: None = Depends(api_key_auth),
 ):
-    """
-    Fetch a single world document by ID.
-    """
     doc = db.get(WorldDocument, doc_id)
     if not doc:
         raise HTTPException(status_code=404, detail="WorldDocument not found")
@@ -433,40 +406,35 @@ async def upsert_player(
 ):
     """
     Create or update a Player row keyed by discord_id.
-    This is the main way the bot / sync scripts register players.
+    IMPORTANT:
+    - aliases is stored as JSON (list) in Postgres, not a JSON string.
+    - mature_ok is NOT overwritten if caller provides null/None.
     """
-    existing = (
-        db.query(Player)
-        .filter(Player.discord_id == player.discord_id)
-        .first()
-    )
+    discord_id = str(player.discord_id)
 
-    aliases_json = json.dumps(player.aliases or [])
-
-    if existing:
-        existing.primary_handle = player.primary_handle
-        existing.display_name = player.display_name
-        existing.avatar_url = player.avatar_url
-        existing.is_npc = player.is_npc
-        existing.mature_ok = player.mature_ok
-        existing.aliases = aliases_json
-        db.add(existing)
-        db.commit()
-        db.refresh(existing)
-        obj = existing
-    else:
-        obj = Player(
-            discord_id=player.discord_id,
-            primary_handle=player.primary_handle,
-            display_name=player.display_name,
-            avatar_url=player.avatar_url,
-            is_npc=player.is_npc,
-            mature_ok=player.mature_ok,
-            aliases=aliases_json,
-        )
+    obj = db.query(Player).filter(Player.discord_id == discord_id).first()
+    if not obj:
+        obj = Player(discord_id=discord_id)
         db.add(obj)
-        db.commit()
-        db.refresh(obj)
+
+    # Update profile fields (only if provided; don't nuke existing values with None)
+    if player.primary_handle is not None:
+        obj.primary_handle = player.primary_handle
+    if player.display_name is not None:
+        obj.display_name = player.display_name
+    if player.avatar_url is not None:
+        obj.avatar_url = player.avatar_url
+
+    # These are safe to overwrite
+    obj.is_npc = bool(player.is_npc)
+    obj.aliases = list(player.aliases or [])
+
+    # Mature flag: only set when explicitly provided
+    if getattr(player, "mature_ok", None) is not None:
+        obj.mature_ok = bool(player.mature_ok)
+
+    db.commit()
+    db.refresh(obj)
 
     return PlayerOut(
         id=obj.id,
@@ -475,8 +443,8 @@ async def upsert_player(
         display_name=obj.display_name,
         avatar_url=obj.avatar_url,
         is_npc=obj.is_npc,
-        aliases=json.loads(obj.aliases or "[]"),
-        mature_ok=obj.mature_ok,
+        aliases=list(obj.aliases or []),
+        mature_ok=bool(getattr(obj, "mature_ok", False)),
     )
 
 
@@ -486,14 +454,7 @@ async def get_player(
     db: Session = Depends(get_db),
     _: None = Depends(api_key_auth),
 ):
-    """
-    Fetch a single player by their Discord user ID.
-    """
-    obj = (
-        db.query(Player)
-        .filter(Player.discord_id == discord_id)
-        .first()
-    )
+    obj = db.query(Player).filter(Player.discord_id == str(discord_id)).first()
     if not obj:
         raise HTTPException(status_code=404, detail="Player not found")
 
@@ -504,8 +465,8 @@ async def get_player(
         display_name=obj.display_name,
         avatar_url=obj.avatar_url,
         is_npc=obj.is_npc,
-        aliases=json.loads(obj.aliases or "[]"),
-        mature_ok=obj.mature_ok,
+        aliases=list(obj.aliases or []),
+        mature_ok=bool(getattr(obj, "mature_ok", False)),
     )
 
 
@@ -515,12 +476,7 @@ async def find_players_by_handle(
     db: Session = Depends(get_db),
     _: None = Depends(api_key_auth),
 ):
-    """
-    Search for players by handle / display name / alias substring.
-    Useful when someone types a name instead of a raw Discord ID.
-    """
     term = f"%{handle}%"
-
     objs = (
         db.query(Player)
         .filter(
@@ -533,19 +489,16 @@ async def find_players_by_handle(
         .all()
     )
 
-    results: List[PlayerOut] = []
-    for obj in objs:
-        results.append(
-            PlayerOut(
-                id=obj.id,
-                discord_id=obj.discord_id,
-                primary_handle=obj.primary_handle,
-                display_name=obj.display_name,
-                avatar_url=obj.avatar_url,
-                is_npc=obj.is_npc,
-                aliases=json.loads(obj.aliases or "[]"),
-                mature_ok=obj.mature_ok,
-            )
+    return [
+        PlayerOut(
+            id=o.id,
+            discord_id=o.discord_id,
+            primary_handle=o.primary_handle,
+            display_name=o.display_name,
+            avatar_url=o.avatar_url,
+            is_npc=o.is_npc,
+            aliases=list(o.aliases or []),
+            mature_ok=bool(getattr(o, "mature_ok", False)),
         )
-
-    return results
+        for o in objs
+    ]

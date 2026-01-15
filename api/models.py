@@ -10,10 +10,8 @@ from sqlalchemy import (
     ForeignKey,
     JSON,
 )
-from sqlalchemy.orm import declarative_base, relationship
-
-Base = declarative_base()
-
+from sqlalchemy.orm import relationship
+from .db import Base
 
 class Conversation(Base):
     """
@@ -91,7 +89,6 @@ from sqlalchemy import (
     Text,
 )
 
-from .db import Base  # assuming this is already there
 
 
 class Player(Base):

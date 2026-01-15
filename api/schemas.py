@@ -66,12 +66,12 @@ class LogMessageIn(BaseModel):
 
 class PlayerBase(BaseModel):
     discord_id: str
-    primary_handle: str
+    primary_handle: Optional[str] = None
     display_name: Optional[str] = None
     avatar_url: Optional[str] = None
     is_npc: bool = False
     aliases: List[str] = []
-    mature_ok: bool = False
+    mature_ok: Optional[bool] = False
 
 
 class PlayerCreate(PlayerBase):

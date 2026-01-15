@@ -1,11 +1,7 @@
 # bot/bot.py
-import asyncio
-import re
-from typing import Any, Callable
-
 import discord
-from discord import app_commands
 from discord.ext import tasks
+from discord import app_commands
 import requests
 
 from config import DISCORD_TOKEN, PRIMARY_GUILD_ID, BACKEND_URL, get_headers
@@ -33,113 +29,6 @@ register_gn_commands(tree)
 def _cmd_debug_name(cmd) -> str:
     """Safely get a readable name for an app command or group."""
     return getattr(cmd, "qualified_name", getattr(cmd, "name", repr(cmd)))
-
-
-# -------------------------------------------------
-# Async-safe helpers (avoid blocking Discord loop)
-# -------------------------------------------------
-_HTTP_MAX_CONCURRENCY = 8
-_http_sem = asyncio.Semaphore(_HTTP_MAX_CONCURRENCY)
-
-
-async def _to_thread(fn: Callable[..., Any], *args, **kwargs) -> Any:
-    return await asyncio.to_thread(fn, *args, **kwargs)
-
-
-async def http_get(url: str, *, headers: dict, timeout: int) -> requests.Response:
-    async with _http_sem:
-        return await _to_thread(requests.get, url, headers=headers, timeout=timeout)
-
-
-async def http_post(
-    url: str, *, json: dict, headers: dict, timeout: int
-) -> requests.Response:
-    async with _http_sem:
-        return await _to_thread(
-            requests.post, url, json=json, headers=headers, timeout=timeout
-        )
-
-
-async def run_blocking(fn: Callable[..., Any], *args, **kwargs) -> Any:
-    """
-    Run a blocking helper (like check_health/sync_player) without blocking the event loop.
-    Uses the same semaphore as HTTP to avoid runaway concurrency under load.
-    """
-    async with _http_sem:
-        return await _to_thread(fn, *args, **kwargs)
-
-
-# -------------------------------------------------
-# Discord message chunking (daemon replies can exceed 2k chars)
-# -------------------------------------------------
-DISCORD_MAX_MESSAGE_LEN = 2000
-DISCORD_SAFE_LEN = 1900  # headroom for formatting / weird unicode edge cases
-
-_sentence_re = re.compile(r"(?<=[.!?])\s+")
-
-
-def split_text_sentence_chunks(text: str, limit: int = DISCORD_SAFE_LEN) -> list[str]:
-    """
-    Split text into <=limit chunks, rounding down to nearest sentence boundary.
-    Keeps order. Falls back to hard splitting if a single sentence exceeds limit.
-    """
-    text = (text or "").strip()
-    if not text:
-        return []
-
-    # Split on sentence-ending punctuation followed by whitespace.
-    sentences = _sentence_re.split(text)
-
-    chunks: list[str] = []
-    cur = ""
-
-    def flush():
-        nonlocal cur
-        if cur.strip():
-            chunks.append(cur.strip())
-        cur = ""
-
-    for s in sentences:
-        s = s.strip()
-        if not s:
-            continue
-
-        # If a single "sentence" is longer than limit, hard-split it.
-        if len(s) > limit:
-            flush()
-            start = 0
-            while start < len(s):
-                part = s[start : start + limit]
-                chunks.append(part)
-                start += limit
-            continue
-
-        # Add sentence to current chunk if it fits.
-        if not cur:
-            cur = s
-        elif len(cur) + 1 + len(s) <= limit:
-            cur = f"{cur} {s}"
-        else:
-            flush()
-            cur = s
-
-    flush()
-    return chunks
-
-
-async def send_discord_chunked(
-    channel: discord.abc.Messageable, text: str, limit: int = DISCORD_SAFE_LEN
-) -> None:
-    """Send text in ordered chunks under Discord message limits."""
-    chunks = split_text_sentence_chunks(text, limit=limit)
-    if not chunks:
-        return
-
-    for i, chunk in enumerate(chunks):
-        await channel.send(chunk)
-        # small pause reduces rate-limit risk when sending many chunks
-        if i < len(chunks) - 1:
-            await asyncio.sleep(0.35)
 
 
 # -------------------------------------------------
@@ -188,17 +77,14 @@ async def on_ready():
 
 
 # -------------------------------------------------
-# Heartbeat Loop (every 6 hours)
+# Heartbeat Loop (once per hour)
 # -------------------------------------------------
-HEARTBEAT_INTERVAL_SECONDS = 6 * 60 * 60  # 6 hours
-
-
-@tasks.loop(seconds=HEARTBEAT_INTERVAL_SECONDS)
+@tasks.loop(seconds=216000)
 async def heartbeat_task():
     """Periodic health ping to #heartbeat + presence update."""
     ch = await get_heartbeat_channel(client)
+    ok, data = check_health()
 
-    ok, data = await run_blocking(check_health)
     await update_presence_from_health(client)
 
     if ch is None:
@@ -229,8 +115,8 @@ async def on_message(message: discord.Message):
     if message.author.bot:
         return
 
-    # Keep player record synced (avoid blocking loop)
-    await run_blocking(sync_player, message.author)
+    # Keep player record synced
+    sync_player(message.author)
 
     content = message.content.strip()
 
@@ -243,7 +129,7 @@ async def on_message(message: discord.Message):
             )
             return
 
-        ok, data = await run_blocking(check_health)
+        ok, data = check_health()
         await update_presence_from_health(client)
 
         if ok:
@@ -274,7 +160,7 @@ async def on_message(message: discord.Message):
             )
             return
 
-        ok, data = await run_blocking(check_deep_health)
+        ok, data = check_deep_health()
         await update_presence_from_health(client)
 
         if not ok:
@@ -336,7 +222,7 @@ async def on_message(message: discord.Message):
         }
 
         try:
-            resp = await http_post(
+            resp = requests.post(
                 f"{BACKEND_URL}/search",
                 json=payload,
                 headers=get_headers(),
@@ -370,7 +256,7 @@ async def on_message(message: discord.Message):
     # Look up player to get mature_ok and feed as a system hint
     mature_hint = "SYSTEM: player_mature_ok=false"
     try:
-        resp = await http_get(
+        resp = requests.get(
             f"{BACKEND_URL}/players/{message.author.id}",
             headers=get_headers(),
             timeout=5,
@@ -385,17 +271,18 @@ async def on_message(message: discord.Message):
 
     payload = {
         "system": mature_hint,
-        "messages": [{"role": "user", "content": message.content}],
+        "messages": [
+            {"role": "user", "content": message.content}
+        ],
     }
 
     try:
-        async with message.channel.typing():
-            resp = await http_post(
-                f"{BACKEND_URL}/chat",
-                json=payload,
-                headers=get_headers(),
-                timeout=90,
-            )
+        resp = requests.post(
+            f"{BACKEND_URL}/chat",
+            json=payload,
+            headers=get_headers(),
+            timeout=90,
+        )
         resp.raise_for_status()
         data = resp.json()
         reply_text = data.get("content") or str(data)
@@ -409,8 +296,7 @@ async def on_message(message: discord.Message):
     except Exception as e:
         reply_text = f"GhostNet backend error: {e}"
 
-    # Send in ordered sentence-rounded chunks to stay under Discord message limits.
-    await send_discord_chunked(message.channel, reply_text)
+    await message.channel.send(reply_text)
 
 
 # -------------------------------------------------
