@@ -177,6 +177,41 @@ def trim(s: str, n: int) -> str:
     return s if len(s) <= n else s[:n] + "…"
 
 
+def pack_context(hits, *, budget_chars: int, max_docs: int) -> List[str]:
+    """
+    Fit retrieved documents into the context budget on DOCUMENT boundaries.
+
+    The previous approach joined everything and cut at a fixed character
+    count, which sliced the last document mid-sentence -- handing the model a
+    fragment of a faction brief that stops in the middle of a clause, which is
+    worse than omitting it.
+
+    Two deliberate choices:
+      * Oversized documents are SKIPPED, not truncated. A partial definition
+        invites the model to complete it from its own priors, which is exactly
+        the invention we are trying to stop.
+      * A document that does not fit does not end the loop -- a smaller,
+        lower-ranked document can still fill the remaining budget. Retrieval
+        order is by score, so this trades a little relevance for more coverage.
+    """
+    packed: List[str] = []
+    used = 0
+
+    for text, _score in hits:
+        t = (text or "").strip()
+        if not t:
+            continue
+        cost = len(t) + 2  # "\n\n" separator
+        if used + cost > budget_chars:
+            continue
+        packed.append(t)
+        used += cost
+        if len(packed) >= max_docs:
+            break
+
+    return packed
+
+
 # Terminal punctuation, including closing quotes/brackets after a stop.
 _SENTENCE_END = re.compile(r'[.!?][)"\'’”\]]*(?:\s|$)')
 
@@ -311,6 +346,13 @@ No sexual content involving minors. If someone asks for real-world harm
 guidance, step outside the fiction and answer plainly.
 """.strip()
 
+    # Echo detection must compare ONLY against INSTRUCTION text. Retrieved
+    # canon and memory are CONTENT -- the model quoting a faction brief back
+    # is correct behaviour, not regurgitation. Passing every system message
+    # here flagged good answers as leaks, regenerated, flagged again, and fell
+    # back to "signal degraded" (observed 2026-09-20 05:34).
+    instruction_texts: List[str] = [base_policy]
+
     msgs.append({"role": "system", "content": base_policy})
 
     # Force mature on for full testing, regardless of player record.
@@ -320,6 +362,7 @@ guidance, step outside the fiction and answer plainly.
     # Optional extra system hint from caller (e.g. bot passes player_mature_ok=...)
     if req.system:
         msgs.append({"role": "system", "content": req.system})
+        instruction_texts.append(req.system)
 
     # --- Player memory (who this person is, what they missed) -------------
     if player is not None:
@@ -360,10 +403,15 @@ guidance, step outside the fiction and answer plainly.
         # model to anchor on material that isn't there -- which is strictly
         # worse than the honest "no echoes" branch below. See the payload-key
         # mismatch fixed in api/rag.py:search_similar.
-        strong = [
-            d for d, s in hits
+        above_floor = [
+            (d, s) for d, s in hits
             if s >= RAG_SCORE_THRESHOLD and d and d.strip()
-        ][:MAX_RAG_DOCS]
+        ]
+        strong = pack_context(
+            above_floor,
+            budget_chars=settings.rag_context_chars,
+            max_docs=MAX_RAG_DOCS,
+        )
 
         # Both messages are deliberately terse and written as telemetry rather
         # than as stage directions. The previous no-match text was a paragraph
@@ -372,7 +420,8 @@ guidance, step outside the fiction and answer plainly.
         # declarative, and shaped like a terminal readout means there is less
         # to leak -- and that a leak still reads as in-world.
         if strong:
-            ctx = trim("\n\n".join(strong), settings.rag_context_chars)
+            # Already within budget and cut on document boundaries.
+            ctx = "\n\n".join(strong)
             msgs.insert(
                 0,
                 {
@@ -416,13 +465,12 @@ guidance, step outside the fiction and answer plainly.
     # out of the RAG corpus. One regeneration, then a flavoured fallback:
     # a non-answer in character beats a character break.
     if req.guard:
-        # Pass the system messages so prompt regurgitation is detectable.
-        # On 2026-09-19 the daemon replied to "testing" by reciting this very
-        # block back to the player -- a total character break that contains no
-        # vendor name and no assistant phrasing, so keyword matching cannot
-        # see it. See detect_prompt_echo in api/guard.py.
-        system_texts = [m["content"] for m in msgs if m.get("role") == "system"]
-        verdict = screen_output(content, system_texts=system_texts)
+        # Instruction text only -- see instruction_texts above. On 2026-09-19
+        # the daemon replied to "testing" by reciting its policy block at the
+        # player: a total character break containing no vendor name and no
+        # assistant phrasing, invisible to keyword matching. That is what this
+        # catches. Retrieved canon is deliberately NOT included.
+        verdict = screen_output(content, system_texts=instruction_texts)
         if verdict.leaked:
             print(
                 f"[guard] output leak {verdict.categories} -- regenerating",
@@ -436,7 +484,7 @@ guidance, step outside the fiction and answer plainly.
             except (httpx.ReadTimeout, httpx.ConnectError, LLMError):
                 retry = ""
 
-            if retry and not screen_output(retry, system_texts=system_texts).leaked:
+            if retry and not screen_output(retry, system_texts=instruction_texts).leaked:
                 content = retry
             else:
                 print("[guard] retry still leaking -- using fallback", flush=True)
