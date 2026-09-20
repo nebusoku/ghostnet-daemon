@@ -10,7 +10,20 @@ from .models import WorldDocument
 
 # --------- Embeddings --------- #
 
-async def embed_texts(http: httpx.AsyncClient, texts: List[str]) -> List[List[float]]:
+# nomic-embed-text is a TASK-PREFIXED model: it expects "search_document: "
+# on stored text and "search_query: " on queries. Without them, embeddings
+# from both sides land in the same undifferentiated region and cosine scores
+# compress into a narrow band -- measured on the live collection, every score
+# fell between 0.42 and 0.50 against a 0.55 threshold, so retrieval returned
+# documents and the caller discarded all of them.
+_PREFIX = {"document": "search_document: ", "query": "search_query: "}
+
+
+async def embed_texts(
+    http: httpx.AsyncClient,
+    texts: List[str],
+    task: str = "document",
+) -> List[List[float]]:
     """
     Call Ollama embeddings (Ollama 0.12.x style).
 
@@ -21,11 +34,18 @@ async def embed_texts(http: httpx.AsyncClient, texts: List[str]) -> List[List[fl
     We call Ollama once per text and collect the vectors.
     """
     embeddings: List[List[float]] = []
+    prefix = _PREFIX.get(task, _PREFIX["document"])
 
     for t in texts:
+        prompt = t
+        if settings.embed_use_prefix and not t.startswith(
+            ("search_document:", "search_query:")
+        ):
+            prompt = prefix + t
+
         r = await http.post(
             f"{settings.ollama_url}/api/embeddings",
-            json={"model": settings.embed_model, "prompt": t},
+            json={"model": settings.embed_model, "prompt": prompt},
             timeout=120,
         )
         r.raise_for_status()
@@ -117,7 +137,7 @@ async def search_similar(
     Search in the generic RAG collection by similarity to the query string.
     Returns (text, score) pairs.
     """
-    qv = (await embed_texts(http, [query]))[0]
+    qv = (await embed_texts(http, [query], task="query"))[0]
     res = qc.search(
         collection_name=settings.collection,
         query_vector=qv,

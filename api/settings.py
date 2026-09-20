@@ -91,6 +91,12 @@ class Settings(BaseModel):
     # api/memory.py:estimate_tokens for why there is no tokeniser dependency.
     token_chars_per: int = int(os.getenv("TOKEN_CHARS_PER", 4))
 
+    # nomic-embed-text requires task prefixes; disable only if you switch to
+    # an embedding model that does not use them.
+    embed_use_prefix: bool = os.getenv("EMBED_USE_PREFIX", "true").strip().lower() in (
+        "1", "true", "yes", "y", "on"
+    )
+
     # RAG tuning
     max_input_tokens: int = int(os.getenv("MAX_INPUT_TOKENS", 6000))
     top_k: int = int(os.getenv("RETRIEVAL_TOP_K", 2))

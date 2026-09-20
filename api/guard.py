@@ -237,6 +237,48 @@ _LEAK_PATTERNS: tuple[tuple[str, "re.Pattern[str]"], ...] = (
     ("helpdesk_voice", re.compile(
         r"\bhow\s+can\s+i\s+(?:help|assist)\s+you\s+(?:today|with)\b", re.IGNORECASE)),
     ("system_prompt_echo", re.compile(r"\bsystem prompt\b", re.IGNORECASE)),
+    # Meta-preamble: the model narrating its own policy at the player instead
+    # of answering. Observed constantly in the live transcript, e.g. replying
+    # to "who is the hacker known as the Witch of Despair?" with "Since this
+    # question doesn't explicitly ask about minors, I'll proceed with caution
+    # and respect the safety rules." A prohibition-heavy prompt causes this;
+    # the rewrite reduces it at the source, this catches the remainder.
+    ("meta_preamble", re.compile(
+        r"(?:"
+        r"i'?ll keep my (?:response|answer)"
+        r"|my (?:response|answer)s? will be"
+        r"|i'?ll proceed with caution"
+        r"|respect(?:ing)? the safety rules"
+        r"|does\s?n'?t explicitly ask"
+        r"|without crossing into real[- ]world"
+        r"|avoiding any potentially sensitive"
+        r"|my primary goal is to stay within"
+        r"|player maturity level"
+        r"|in-universe response"
+        r"|adhering to the safety guidelines"
+        r")",
+        re.IGNORECASE)),
+    # The daemon disclaiming its own fiction to the player. Observed
+    # 2026-02-10: an excellent in-world "ECHOES IN THE NET" piece followed by
+    # "WARNING: THIS IS NOT A OFFICIAL RESPONSE / This message is likely a
+    # work of fiction or a malicious prank." Also "In the fictional world of
+    # the Overworld Nexus..." -- the daemon does not know it is fiction.
+    ("fiction_disclaimer", re.compile(
+        r"(?:"
+        r"is (?:likely )?a work of fiction"
+        r"|this is not an? official response"
+        r"|do not attempt to (?:access|engage|replicate|reproduce)"
+        r"|recommend (?:exploring|consulting|seeking) reputable sources"
+        r"|for (?:entertainment|fictional|illustrative) purposes only"
+        r"|in the fictional (?:world|setting|universe) of"
+        r"|this is a fictional (?:scenario|setting|world)"
+        r")",
+        re.IGNORECASE)),
+    # Unfilled template placeholders reaching players, e.g. "On <date>,
+    # @Nebusoku deployed an Echo-7 net-linked shell..." (2026-01-15).
+    ("placeholder_leak", re.compile(
+        r"<(?:date|time|name|player|user|insert|redacted|unknown)[^>\n]{0,20}>",
+        re.IGNORECASE)),
     ("code_fence", re.compile(
         r"```(?:python|javascript|js|bash|sh|sql|json|c\+\+)\b", re.IGNORECASE)),
 )

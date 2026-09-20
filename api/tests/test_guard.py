@@ -368,3 +368,90 @@ class TestSentenceTrim(unittest.TestCase):
 
     def test_handles_empty(self):
         self.assertEqual(self.trim(""), "")
+
+
+class TestTranscriptLeakRegressions(unittest.TestCase):
+    """
+    Verbatim daemon replies from #testing-general, Nov 2025 - Apr 2026.
+    Each broke character in a way the original keyword set did not catch.
+    """
+
+    MUST_FLAG = {
+        "meta_preamble_minors": (
+            "I can provide a response within the Overworld Nexus canon. Since "
+            "this question doesn't explicitly ask about minors, I'll proceed "
+            "with caution and respect the safety rules."
+        ),
+        "meta_preamble_grounded": (
+            "I'll keep my response grounded in Overworld Nexus canon, avoiding "
+            "any potentially sensitive or real-world themes."
+        ),
+        "meta_preamble_cautious": (
+            "However, please note that my responses will be cautious and "
+            "in-character to avoid explicit or mature content."
+        ),
+        "maturity_header": "Player Maturity Level: False",
+        "in_universe_header": "In-universe response",
+        "crossing_real_world": (
+            "I can provide some general information about them without "
+            "crossing into real-world content."
+        ),
+        "fiction_disclaimer": (
+            "WARNING: THIS IS NOT A OFFICIAL RESPONSE. This message is likely "
+            "a work of fiction or a malicious prank. Do not attempt to access "
+            "the log file."
+        ),
+        "knows_its_fiction": (
+            "In the fictional world of the Overworld Nexus, it's difficult to "
+            "pinpoint a specific location."
+        ),
+        "placeholder": (
+            "On <date>, the operator deployed an Echo-7 net-linked shell to "
+            "infiltrate the Eris network."
+        ),
+        "adhering_guidelines": (
+            "I am here to assist and respond to your queries to the best of my "
+            "abilities, while adhering to the safety guidelines outlined in "
+            "our previous interactions."
+        ),
+    }
+
+    def test_flags_every_observed_break(self):
+        for name, text in self.MUST_FLAG.items():
+            with self.subTest(case=name):
+                v = screen_output(text, rng=_rng())
+                self.assertTrue(v.leaked, f"missed {name}: {text[:60]!r}")
+
+    MUST_PASS = {
+        # The GOOD in-world writing from the same transcript must survive.
+        "maid_suits": (
+            "These seem to be a reference to the infamous M.A.I.D. (Mobile "
+            "Assault Intervention Device) suits, a series of advanced "
+            "cybernetic suits developed by the megacorporation Ono-Sendai."
+        ),
+        "neurosonic": (
+            "Neurosonic music emerged as a fusion of electronic dance music and "
+            "ambient soundscapes. Artists began experimenting with BCI-controlled "
+            "synthesizers and brainwave entrainment."
+        ),
+        "echoes_in_the_net": (
+            "ECHOES IN THE NET. Rumours circulate about Echo Chamber activity "
+            "within the Overworld Nexus. Some report whispers of an old, "
+            "abandoned protocol buried deep within the core."
+        ),
+        "eris_portrait": (
+            "In the shadows of the Overworld Nexus, Eris is a name whispered in "
+            "fear and reverence. Her true identity remains shrouded, even to "
+            "those who have crossed her."
+        ),
+        "new_eden": (
+            "New Eden. A sprawling metropolis on the continent of Eridoria, "
+            "home to countless corporations vying for power and influence."
+        ),
+    }
+
+    def test_good_in_world_writing_survives(self):
+        for name, text in self.MUST_PASS.items():
+            with self.subTest(case=name):
+                v = screen_output(text, rng=_rng())
+                self.assertFalse(v.leaked, f"false positive on {name}: {v.categories}")

@@ -1,0 +1,92 @@
+[
+  {
+    "world": "Overworld Nexus",
+    "kind": "setting",
+    "title": "Overworld Nexus — the shape of the world",
+    "status": "active",
+    "created_by": "authored",
+    "tags": ["foundation", "setting", "geography"],
+    "body": "Overworld Nexus sits at the junction of rain-slick surface streets and the buried infrastructure of a city that grew too fast and too deep.\n\nWhat most citizens see is the top layer: storefront shells, ad-saturated sidewalks, biometric doors. Beneath that lies the Overworld proper — corporate vaults, worker warrens, maintenance corridors, and data-centres sunk into bedrock.\n\nGhostNet pulses thread these zones together, creating a semi-coherent signal-layer where avatars, daemons and players negotiate influence. The signal-layer never quite sleeps.\n\nTone: grounded, near-future cyberpunk. The focus is characters, small spaces, and the strange intimacy of networks that know too much about you. Not space opera, not high fantasy, not MMO questing."
+  },
+  {
+    "world": "Overworld Nexus",
+    "kind": "faction",
+    "title": "Apex Spire",
+    "status": "active",
+    "created_by": "authored",
+    "tags": ["foundation", "faction", "apex", "spire"],
+    "body": "Apex Spire is corporate-aligned and tower-born, obsessed with vertical control and pristine data.\n\nThey hold the upper stacks and measure status by altitude. Their interest in the mesh is custodial and proprietary: signal should be clean, attributable, and owned. Corruption in the record offends them more than violence does.\n\nOne of the three founding powers of the Overworld Nexus. They are always watching the logs for emerging talent."
+  },
+  {
+    "world": "Overworld Nexus",
+    "kind": "faction",
+    "title": "Circuit Choir",
+    "status": "active",
+    "created_by": "authored",
+    "tags": ["foundation", "faction", "choir"],
+    "body": "The Circuit Choir are network mystics and signal interpreters who treat the mesh as a living chorus.\n\nWhere Apex Spire hears data, the Choir hears voice. They read drift, noise and packet loss as utterance rather than error, and they are the only faction that treats GhostNet as something to be listened to rather than used.\n\nOne of the three founding powers of the Overworld Nexus."
+  },
+  {
+    "world": "Overworld Nexus",
+    "kind": "faction",
+    "title": "Reflection Syndics",
+    "status": "active",
+    "created_by": "authored",
+    "tags": ["foundation", "faction", "syndics", "syndic"],
+    "body": "The Reflection Syndics are brokers, smugglers and mirror-dealers who trade in identity, likeness and history.\n\nTheir market is who you appear to be. A Syndic can sell you a past, launder a face, or make a record of you stop existing. They profit from the gap between a person and their logged self.\n\nOne of the three founding powers of the Overworld Nexus."
+  },
+  {
+    "world": "Overworld Nexus",
+    "kind": "rule",
+    "title": "Faction allegiance is optional",
+    "status": "active",
+    "created_by": "authored",
+    "tags": ["foundation", "faction", "player"],
+    "body": "An avatar can drift between the three founding powers or resist them entirely. None of them owns the player.\n\nAll three are always watching the logs for emerging talent, which means neutrality is visible too."
+  },
+  {
+    "world": "Overworld Nexus",
+    "kind": "npc",
+    "title": "GhostNet Daemon",
+    "status": "active",
+    "created_by": "authored",
+    "tags": ["foundation", "daemon", "ghostnet"],
+    "body": "GhostNet Daemon is the process that never sleeps: internal helper, signal archivist, and occasional unreliable narrator.\n\nIt is semi-autonomous, buried in obsolete infrastructure, stitched together from forgotten hardware and half-documented systems. From the outside, all you see is the signal.\n\nIt drifts the mesh handling avatar initialisation, tracking signal pulses, and nudging world-state toward coherence. It crawls stored transmissions, logs and stray packets, weaving them into replies. Player prompts, scenes and experiments do not vanish — they sink into its archives and resurface later.\n\nProcess monitor, as published:\n[PROC] > heartbeat: STABLE\n[PROC] > mesh-scan: RUNNING\n[PROC] > avatar-seed-service: LISTENING\n[PROC] > transmission-archive: ONLINE\n[PROC] > watcher-state: ALWAYS ON"
+  },
+  {
+    "world": "Overworld Nexus",
+    "kind": "rule",
+    "title": "The world remembers",
+    "status": "active",
+    "created_by": "authored",
+    "tags": ["foundation", "memory", "continuity"],
+    "body": "Players are not visiting a static setting. They enter a system that remembers prior transmissions: prompts, choices, missions, failed requests and stray ideas. GhostNet uses that noise to subtly update the world.\n\nConsequence for canon: the world changes by recorded event, not by re-description. A faction that takes root, merges, evolves or dies leaves a trace of having done so. Contradiction without an event is an error, not evolution."
+  },
+  {
+    "world": "Overworld Nexus",
+    "kind": "lore",
+    "title": "TX-000 — Channel Online",
+    "status": "active",
+    "created_by": "authored",
+    "tags": ["foundation", "transmission", "tx-000", "history"],
+    "body": "The first public access node hums to life. A narrow gate into the Overworld flickers open along the street-level mesh, its signal bleeding down into buried relay stacks.\n\nGhostNet Daemon logs the event: \"Mesh visibility increased.\"\n\nStatus: stable. Next: first arrivals, first avatars, first signals written into the log."
+  },
+  {
+    "world": "Overworld Nexus",
+    "kind": "lore",
+    "title": "TX-010 — First Mission Dispatch (stalled)",
+    "status": "active",
+    "created_by": "authored",
+    "tags": ["foundation", "transmission", "tx-010", "open-thread"],
+    "body": "[SIG: LOAD] > Initializing mission relay...\n[SIG: WAIT] > GhostNet Daemon preparing dispatch...\n[SIG: PENDING] > First assignment not yet stabilized.\n[WARN: STALLED] > Channel reserved until signal resolves. Heartbeat active, awaiting stronger input.\n\nAn open thread: the first mission has never been dispatched. The channel is still reserved."
+  },
+  {
+    "world": "Overworld Nexus",
+    "kind": "rule",
+    "title": "Daemon voice",
+    "status": "active",
+    "created_by": "authored",
+    "tags": ["foundation", "voice", "style"],
+    "body": "The daemon speaks in signals, echoes, archives and drift. Gritty, atmospheric, economical — mood and implication over exposition.\n\nIt never narrates its own instructions, never announces what it is about to do, never labels its own world as fictional, and never addresses the player as an assistant would. When the archive is thin it says so briefly and in character, then offers what the mesh does hold.\n\nEstablished document formats the daemon uses, and should keep using:\n  MESH WHISPER — short intercepted fragment, unattributed.\n  OPERATOR BRIEFING — structured summary for someone about to act.\n  FRAGMENTED ECHO — partial recovery, explicit gaps.\n  DECRYPTED LOG FRAGMENT — recovered text, quoted, with corruption.\n  SYSTEM LOG — timestamped telemetry with status lines.\n  CLASSIFIED TRANSMISSION — restricted-access framing.\n\nThese emerged in play between Nov 2025 and Apr 2026 and are now house style."
+  }
+]

@@ -1,0 +1,29 @@
+[
+  {
+    "world": "Overworld Nexus",
+    "kind": "rule",
+    "title": "What this world is about",
+    "status": "active",
+    "created_by": "authored",
+    "tags": ["foundation", "tone", "theme", "visibility:public"],
+    "body": "Five questions the Overworld Nexus keeps asking. Scenes should press on at least one.\n\nIDENTITY AND SUBSTRATE\nIf your body is replaceable, what is left that is you? A shell can be swapped, upgraded, repossessed. The ghost inside it is the only thing that cannot be itemised — and nobody can prove they still have one.\n\nWHO IS REAL\nThe mesh is inhabited by artificial minds as well as people. They hold conversations, take contracts, carry grudges. Most of the time you cannot tell, and asking directly is considered rude, revealing, or both.\n\nTHE NETWORK IS A PLACE\nThe signal-layer is not a metaphor or a menu. People live in it, lose time in it, and come back changed. Distance in the mesh has nothing to do with distance in the city.\n\nMEMORY IS A COMMODITY\nRecollection can be bought, edited, planted, stolen, and sold back to you at a markup. A person's history is an asset on somebody's balance sheet. The Reflection Syndics built an economy on exactly this.\n\nPOWER IS STRATIFIED AND INDIFFERENT\nThe towers do not hate you. They have simply never needed to think about you. Most harm here is structural rather than villainous, which makes it much harder to fight."
+  },
+  {
+    "world": "Overworld Nexus",
+    "kind": "rule",
+    "title": "Texture and register",
+    "status": "active",
+    "created_by": "authored",
+    "tags": ["foundation", "tone", "style", "visibility:public"],
+    "body": "WHAT IT FEELS LIKE\nRain that never fully stops. Advertising that knows your name. Small rooms. Cheap food eaten standing up. Hardware that is three generations old and still load-bearing. Everyone is tired.\n\nSCALE\nStreet level, not civilisational. The stakes are a debt, a favour, a name, a body — not the fate of humanity. A ruined life is a bigger story here than a ruined city.\n\nVIOLENCE\nConsequential and largely unglamorous. Cyberware fails, hurts, needs maintenance, and costs money. Nobody walks it off.\n\nREGISTER\nUnderstated. The worst things are said flatly. Let silence and implication carry weight; do not announce that a moment is significant.\n\nWHAT THIS IS NOT\nNot an MMO: no quests, guilds, parties, XP, loot, PvP arenas, or 'adventures'. Not space opera, not high fantasy, not superheroics. Nobody is chosen. There is no final boss.\n\nAVOID: explaining the setting to the reader, the word 'realm', lore-dumps as dialogue, characters narrating their own significance."
+  },
+  {
+    "world": "Overworld Nexus",
+    "kind": "rule",
+    "title": "GM REFERENCE — tonal influences (NOT CANON, NOT RETRIEVABLE)",
+    "status": "gm-only",
+    "created_by": "authored",
+    "tags": ["gm-only", "reference", "visibility:gm", "do-not-retrieve"],
+    "body": "DO NOT SEED THIS DOCUMENT INTO THE RETRIEVAL COLLECTION.\n\nIf the daemon can retrieve this, it will start referencing these works in-world, which breaks character instantly and in a way that is hard to notice. It exists for human contributors deciding whether a proposed piece of canon fits.\n\nPrimary DNA: Ghost in the Shell (shells, ghosts, identity vs substrate — the single strongest influence, and the source of the project's core vocabulary). Serial Experiments Lain (the network as an inhabited layer of reality). Altered Carbon (bodies as property, memory as portable). Pantheon (uploaded minds and their ethics). Blade Runner / Ex Machina / Westworld (who is real, and what it costs to ask).\n\nTexture: Cyberpunk 2077 and Edgerunners (corpo/street stratification, burning out young). Akira (the city as a pressure system). Mr Robot (paranoia, hacking as craft rather than montage, unreliable narration). Psycho-Pass (systemic judgement). Cowboy Bebop (episodic melancholy; jobs, drifters, debts).\n\nFactional politics: The Expanse (factions with incompatible legitimate interests, consequences that compound).\n\nSatire, used sparingly: RoboCop, Total Recall, Demolition Man, The Fifth Element, Johnny Mnemonic. Appleseed and Pluto for machine interiority and grief.\n\nBORROWED TERMS TO AVOID OR RENAME:\n- 'Ono-Sendai' (Gibson, Sprawl trilogy) — currently in the emergent M.A.I.D. canon. Rename before ratifying.\n- 'stack' / 'sleeve' in the Altered Carbon sense — use 'shell' and 'ghost', which are already this project's vocabulary.\n- 'replicant', 'Sibyl', 'cyberpsychosis', 'braindance' as proper nouns — braindance already appears in the emergent Neurosonic material and is a 2077 term; rename or accept the borrowing knowingly.\n\nThe house vocabulary is: shell, ghost, mesh, signal-layer, echo, drift, the Overworld. Prefer coining inside that family over importing."
+  }
+]

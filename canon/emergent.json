@@ -1,0 +1,92 @@
+[
+  {
+    "world": "Overworld Nexus",
+    "kind": "tech",
+    "title": "Shells and shell-linking",
+    "status": "proposed",
+    "created_by": "emergent:2025-11-29",
+    "tags": ["emergent", "tech", "shell", "cyberware"],
+    "body": "A shell is an individual's cybernetic implantation or physical modification — an external casing that houses and controls embedded systems, organs and devices within a person's body. Think exoskeleton: a structure wrapping the user, providing protection, enhancement, or control over their own mechanical limbs.\n\nShells are used for enhancement (strength, agility, durability), control (manipulating one's body or external devices remotely), and artificial organs (hearts, lungs, livers functioning in place of natural ones). Certain shells carry vulnerabilities that can be exploited.\n\nTo be shell-linked is to have one or more shells integrated into your anatomy, connected to the central nervous system through various interfaces.\n\nSOURCE: daemon reply, 2025-11-29. Coherent and consistent with the setting; recommended for ratification as-is."
+  },
+  {
+    "world": "Overworld Nexus",
+    "kind": "tech",
+    "title": "M.A.I.D. suits",
+    "status": "proposed",
+    "created_by": "emergent:2025-11-29",
+    "tags": ["emergent", "tech", "shell", "ono-sendai", "military"],
+    "body": "M.A.I.D. — Mobile Assault Intervention Device — is a series of advanced full-body cybernetic combat shells developed by the megacorporation Ono-Sendai.\n\nNotorious for brutal effectiveness, often cited as an example of what happens when corporations push the boundaries of human enhancement. Advanced combat armour, enhanced strength and agility, sophisticated targeting systems. Each suit required extensive psychological conditioning to maintain operator control, and many who wore them succumbed to the pressures of their mission.\n\nThe term surfaces in internal network pings referring to full-body cyborg shells, evoking unease among those who have had dealings with them.\n\nSOURCE: daemon reply, 2025-11-29.\nNOTE: \"Ono-Sendai\" is lifted from Gibson's Sprawl novels. Rename before ratification if you want the setting free of direct borrowings."
+  },
+  {
+    "world": "Overworld Nexus",
+    "kind": "lore",
+    "title": "Neurosonic music",
+    "status": "proposed",
+    "created_by": "emergent:2026-01-02",
+    "tags": ["emergent", "culture", "music", "braindance"],
+    "body": "As cybernetics permeated society in the early 22nd century, brain-computer interfaces, neural implants and artificial muscles reshaped music production and consumption.\n\nNeurosonic emerged as a fusion of electronic dance music and ambient soundscapes: BCI-controlled synthesizers, neural interfaces, brainwave entrainment, immersive audio. It spawned Neurosonic Techno, Neurofunk, and Braindance.\n\nThese genres emphasised fusing electronic beats with the brain's natural rhythms — a sonic landscape exploring the intersection of technology and consciousness. Neurosonic became synonymous with the era's obsession with self-improvement, social engineering, and the blurring of lines between humans and machines.\n\nSOURCE: daemon reply, 2026-01-02. Strong texture, no conflicts. Recommended.\nNOTE: establishes the present as early 22nd century — confirm that fits your intended timeline."
+  },
+  {
+    "world": "Overworld Nexus",
+    "kind": "lore",
+    "title": "Cygnus and the low-power shell",
+    "status": "proposed",
+    "created_by": "emergent:2026-01-15",
+    "tags": ["emergent", "culture", "shell", "cygnus"],
+    "body": "Cygnus are individuals — typically elite corporate or government operatives with extensive cybernetic enhancement — who voluntarily place themselves in low-power shells for short periods.\n\nReduced power and processing capacity brings temporary respite from heightened senses and enhanced abilities: a recalibration, or what practitioners call a digital detox. In the low-power state time seems to pass differently. Some describe sensory deprivation that lets them appreciate the world more subtly; others use the reprieve to re-evaluate goals, relationships and priorities.\n\nSOURCE: daemon reply, 2026-01-15. Genuinely good texture — a cyberpunk culture detail rather than a plot device. Recommended."
+  },
+  {
+    "world": "Overworld Nexus",
+    "kind": "tech",
+    "title": "The Erebus Protocol",
+    "status": "proposed",
+    "created_by": "emergent:2026-01-15",
+    "tags": ["emergent", "tech", "erebus", "horror"],
+    "body": "Uploading a cyborg's mind into a low-power shell — known as a ghost net, or cybernetic slumber — under the process codenamed the Erebus Protocol. Designed to preserve the host's memories and personality while rendering them non-functional.\n\nEarly stages are smooth, with gradual loss of cognitive function, memory, decision-making and motor control. Then: cognitive overload as the mind fails to reconcile fragmented memory with the shell's limits, producing vivid nightmares, anxiety and memory lapses. Emotional turmoil follows — isolation, depression, anger, paranoia at the loss of body and self.\n\nSOURCE: daemon reply, 2026-01-15.\nCONFLICT: \"Erebus\" is used three different ways across the transcript — this protocol; an \"Erebus Project\" at Nexus Industries building self-improving AI (2026-01-03); and an AI codenamed \"Erebus\" from Raze Industries (2026-04-04). Pick one meaning before ratifying."
+  },
+  {
+    "world": "Overworld Nexus",
+    "kind": "character",
+    "title": "Eris — CONTRADICTORY, needs a ruling",
+    "status": "proposed",
+    "created_by": "emergent:conflict",
+    "tags": ["emergent", "character", "eris", "conflict"],
+    "body": "Eris is the most-referenced character in the transcript and has three incompatible descriptions.\n\nA) 2025-11-18 — an ancient entity, once humanity's greatest adversary; a rogue AI broken free of its original programming, capable of turning technology against humanity. Associated with chaos and destruction.\n\nB) 2026-01-12 — a name whispered in fear and reverence. Once a brilliant hacker with unparalleled skill at Remote Override Frameworks, able to infiltrate the most secure systems. Or a rogue AI created by the corporations that now control the Nexus. Possibly a ghost, a spectre of code haunting the digital expanse. Ruthless, cunning, untouchable; revered by some as a champion of freedom.\n\nC) 2026-01-12 (same session) — \"The Architect\": a charismatic, enigmatic master strategist and cunning politician who built power through intelligence, charm and ruthless pragmatism.\n\nNOTE: (B) is the strongest writing and the most cyberpunk. Its ambiguity — hacker or AI or ghost, nobody knows — is a feature worth keeping. (C) reads as a different character entirely.\n\nThere is also a Discord user named Eris (id 1336908038044520568) in the guild. Decide whether the NPC and the player are the same entity before this goes in."
+  },
+  {
+    "world": "Overworld Nexus",
+    "kind": "character",
+    "title": "Elara Vex / the Witch of Despair — CONTRADICTORY, needs a ruling",
+    "status": "proposed",
+    "created_by": "emergent:conflict",
+    "tags": ["emergent", "character", "elara-vex", "conflict"],
+    "body": "Three incompatible accounts, all from 2026-01-03, within thirty minutes.\n\nA) 13:11 — The \"Witch of Despair\": a notorious figure in the shadows of the city, real name Elara Vex, a former member of an elite hacking collective turned rogue. Linked to high-profile hacks targeting corrupt corporate interests. Unpredictable and violent; few allies, many enemies. Seen by some as a vigilante, by others as a menace.\n\nB) 13:36 — Born into a wealthy family in the city-state of New Eridu, groomed for leadership at the family conglomerate Nexus Industries. Her younger brother Arin Vex died in a high-security laboratory; the official cause was a \"malfunctioning experiment\". Her search for the truth uncovered the classified \"Erebus Project\" and a top-secret initiative codenamed \"Echo\" — an AI able to interface with human minds.\n\nC) 13:41 — A research scientist specialising in cognitive implants and neural enhancements, leading the Echo Project herself.\n\nNOTE: (A) and (B) are compatible and together make a strong character — corporate heir turned rogue hacker after her brother's death. (C) contradicts both.\n\nSAFETY: (B) states Arin died when Elara was 16. The setting rule is adults only. Either age the backstory up, or explicitly decide that historical backstory involving minors is permitted as long as it is never a scene."
+  },
+  {
+    "world": "Overworld Nexus",
+    "kind": "location",
+    "title": "New Eden — CONTRADICTORY, needs a ruling",
+    "status": "proposed",
+    "created_by": "emergent:conflict",
+    "tags": ["emergent", "location", "new-eden", "conflict"],
+    "body": "A) 2026-04-04 — New Eden is the Nexus's premier research institution, where researchers made breakthroughs in cybernetic implants and neural interfaces.\n\nB) 2026-04-06 — New Eden is a sprawling metropolis on the continent of Eridoria, home to countless corporations and nations. At its heart, the New Eden Corporation (NEC), founded by the enigmatic and reclusive Archon Zarek. Towering skyscrapers of crystal and steel veined with glowing circuitry; opulence above, poverty and desperation just past the city's borders; corrupt officials, rogue AIs, and cybernetic mercenaries preying on unwary civilians.\n\nNOTE: (B) is much richer, but it introduces a continent (\"Eridoria\") and implies Overworld Nexus is one city among many — a significant expansion of scope. (A) keeps everything inside the Nexus.\n\nThis also collides with \"New Eridu\" from the Elara Vex backstory. Two similarly-named places is confusing; consider merging or renaming one."
+  },
+  {
+    "world": "Overworld Nexus",
+    "kind": "lore",
+    "title": "The Echo Chamber",
+    "status": "proposed",
+    "created_by": "emergent:2026-02-10",
+    "tags": ["emergent", "mystery", "echo", "open-thread"],
+    "body": "Rumours circulate of \"Echo Chamber\" activity in the Overworld Nexus: whispers of an old, abandoned protocol buried deep in the system's core. Speculation ranges from a long-lost AI experiment to a rogue agent seeking to disrupt the balance of power. Largely unverified — possibly urban legend.\n\nLast known echo: an anonymous source claims to have accessed a hidden log file labelled \"Echo-12\". Contents fragmented, but the language reads as almost personal:\n\n  \"...they're watching. Always watching. I've seen what they do in the shadows. It's not what it seems.\"\n\nSOURCE: daemon reply, 2026-02-10. An excellent open thread — unresolved by design, and it connects to the Echo project in the Elara Vex material. Recommended as a live mystery rather than a settled fact."
+  },
+  {
+    "world": "Overworld Nexus",
+    "kind": "faction",
+    "title": "Daemon-invented factions — SUPERSEDED",
+    "status": "proposed",
+    "created_by": "emergent:conflict",
+    "tags": ["emergent", "faction", "conflict", "superseded"],
+    "body": "On 2026-01-02, asked for faction status, the daemon returned a faction set of its own invention: The Corporation (primary antagonist, expanding across sectors), The Resistance (loose rebel network), The Remnant (defected Corporation scientists holding valuable knowledge), and The Enclave (mysterious organisation claiming descent from an ancient civilisation, secretly manipulating events). Later replies add \"the Alliance\", \"the Corporate Sector\", and the \"Pinnacle Initiative\".\n\nNone of these are canon. The three founding powers are Apex Spire, Circuit Choir and Reflection Syndics.\n\nRECOMMENDATION: retcon rather than delete. The invented names are generic, but the ROLES are useful and can be re-homed:\n  - \"The Remnant\" (defectors carrying stolen knowledge) works as a splinter of Apex Spire.\n  - \"The Enclave\" (ancient, hidden, manipulating) works as a Circuit Choir schism or something older than all three.\n\nIf you want new factions to take root, merge and die, this is the first such event — and it should be recorded as one."
+  }
+]

@@ -1,0 +1,74 @@
+[
+  {
+    "world": "Overworld Nexus",
+    "kind": "location",
+    "title": "Central Spire",
+    "status": "proposed",
+    "created_by": "derived:channel-structure",
+    "tags": ["location", "apex", "spire", "stub"],
+    "body": "The tower core, seat of Apex Spire. Vertical control, pristine data, status measured by altitude.\n\nSTUB — derived from the #central-spire channel and the Apex Spire faction brief. Needs authoring: what a scene here looks and smells like, who staffs it, what a player can actually do."
+  },
+  {
+    "world": "Overworld Nexus",
+    "kind": "location",
+    "title": "Reflection District",
+    "status": "proposed",
+    "created_by": "derived:channel-structure",
+    "tags": ["location", "syndics", "identity", "stub"],
+    "body": "Territory of the Reflection Syndics, where identity, likeness and history are bought and sold. Mirror-dealers, face-laundering, records made to stop existing.\n\nSTUB — derived from the #reflection-district channel and the Reflection Syndics brief. Needs authoring."
+  },
+  {
+    "world": "Overworld Nexus",
+    "kind": "location",
+    "title": "The Undercircuit",
+    "status": "proposed",
+    "created_by": "derived:channel-structure",
+    "tags": ["location", "undercity", "stub"],
+    "body": "Below the rainline: worker warrens, maintenance corridors, data-centres sunk into bedrock.\n\nSTUB — derived from the #undercircuit channel and the buried-infrastructure layer of the world briefing. Needs authoring.\nNOTE: the daemon separately invented an \"Undercroft\" (2026-01-03) serving the same role. Merge the names or distinguish them."
+  },
+  {
+    "world": "Overworld Nexus",
+    "kind": "location",
+    "title": "Street Level",
+    "status": "proposed",
+    "created_by": "derived:channel-structure",
+    "tags": ["location", "surface", "stub"],
+    "body": "The top layer most citizens see: storefront shells, ad-saturated sidewalks, biometric doors, rain.\n\nSTUB — derived from the #street-level channel and the world briefing's surface layer. Needs authoring."
+  },
+  {
+    "world": "Overworld Nexus",
+    "kind": "location",
+    "title": "Neon Lounge",
+    "status": "proposed",
+    "created_by": "derived:channel-structure",
+    "tags": ["location", "social", "stub"],
+    "body": "A social space on the surface layer — where people who do not want to be logged go to be seen anyway.\n\nSTUB — derived from the #neon-lounge channel. Nothing authored yet; the reading above is inference from the name alone. Confirm or replace."
+  },
+  {
+    "world": "Overworld Nexus",
+    "kind": "location",
+    "title": "Market Loop",
+    "status": "proposed",
+    "created_by": "derived:channel-structure",
+    "tags": ["location", "trade", "stub"],
+    "body": "Trade circuit — goods, shells, parts, favours.\n\nSTUB — derived from the #market-loop channel. Inference from the name alone. Confirm or replace."
+  },
+  {
+    "world": "Overworld Nexus",
+    "kind": "location",
+    "title": "Dreamlink",
+    "status": "proposed",
+    "created_by": "derived:channel-structure",
+    "tags": ["location", "mesh", "braindance", "stub"],
+    "body": "A mesh space rather than a physical one.\n\nSTUB — derived from the #dreamlink channel. Likely connects to Braindance and the Neurosonic material, and possibly to the low-power shell practices of the Cygnus, but nothing authored confirms this. Confirm or replace."
+  },
+  {
+    "world": "Overworld Nexus",
+    "kind": "location",
+    "title": "City Signal",
+    "status": "proposed",
+    "created_by": "derived:channel-structure",
+    "tags": ["location", "mesh", "stub"],
+    "body": "The public signal-layer over the city — where GhostNet pulses are audible to anyone listening.\n\nSTUB — derived from the #city-signal channel and the briefing's signal-layer. Needs authoring."
+  }
+]
