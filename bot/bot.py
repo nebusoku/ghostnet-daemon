@@ -336,7 +336,12 @@ async def on_message(message: discord.Message):
 
     payload = {
         "system": mature_hint,
-        "messages": [{"role": "user", "content": message.content}],
+        # clean_content resolves <@123456789> mentions to readable display
+        # names, <#id> to channel names and <@&id> to role names. Sending raw
+        # content means the model sees bare snowflakes and echoes them back at
+        # players -- the daemon referring to "227145716458323979" instead of
+        # "FossilizedFibonacci".
+        "messages": [{"role": "user", "content": message.clean_content}],
         # Memory binding. The channel groups turns into a scene; the author id
         # is the identity the world tracks across channels and absences.
         # Only the newest turn is sent -- the API assembles history from its

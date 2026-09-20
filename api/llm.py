@@ -424,6 +424,30 @@ async def generate_with(
 
 _CLI_LOCK = asyncio.Lock()
 
+# Negative cache for CLI invocations that failed.
+#
+# CLI_MODELS deliberately lists UNRELEASED versions ahead of the current one
+# so they self-activate on release. The cost is that every message re-probes
+# a model that does not exist yet -- measured ~2s per probe against
+# gpt-5.7-luna, paid on every single reply.
+#
+# Remembering the failure for a while keeps the auto-activation benefit
+# without the per-message tax: a newly released model is picked up within one
+# TTL instead of instantly, which is a fine trade for seconds off every turn.
+_CLI_MISSES: dict = {}
+
+
+def _cli_miss_remaining(key: str) -> float:
+    """Seconds left on a cached failure for this invocation, 0 if none."""
+    expires = _CLI_MISSES.get(key)
+    if not expires:
+        return 0.0
+    left = expires - asyncio.get_event_loop().time()
+    if left <= 0:
+        _CLI_MISSES.pop(key, None)
+        return 0.0
+    return left
+
 # CLIs emit colour codes and spinner control sequences even when piped.
 _ANSI = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07]*\x07")
 
@@ -449,6 +473,14 @@ async def _generate_cli(p: Provider, messages: List[dict], max_tokens: int) -> s
         raise ProviderUnavailable("cli: CLI_COMMAND not set")
     if not p.model or p.model == "(unset)":
         raise ProviderUnavailable("cli: no invocation configured")
+
+    # Skip an invocation known to have failed recently, rather than paying for
+    # another subprocess spawn to rediscover it.
+    left = _cli_miss_remaining(p.model)
+    if left:
+        raise ProviderUnavailable(
+            f"cli: {p.name} failed recently, retrying in {left:.0f}s"
+        )
 
     # p.model holds the full invocation, including the per-model flag when
     # the chain expanded "cli" into "cli#<model>".
@@ -501,6 +533,11 @@ async def _generate_cli(p: Provider, messages: List[dict], max_tokens: int) -> s
 
         if proc.returncode != 0:
             detail = (err or b"").decode("utf-8", "replace").strip()[:300]
+            # Remember the failure so unreleased models listed in CLI_MODELS
+            # stop costing a probe on every single message.
+            _CLI_MISSES[p.model] = (
+                asyncio.get_event_loop().time() + settings.cli_miss_ttl
+            )
             raise ProviderUnavailable(
                 f"cli: exit {proc.returncode}: {detail or '(no stderr)'}"
             )

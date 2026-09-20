@@ -30,6 +30,7 @@ from .memory import (
 from .player_memory import (
     load_player_context,
     maybe_compact_player,
+    record_player_event,
     touch_last_seen,
 )
 from .rag import upsert_texts, search_similar, upsert_world_documents
@@ -501,6 +502,25 @@ guidance, step outside the fiction and answer plainly.
         record_message(db, convo, role="assistant", content=content,
                        model=describe_backend())
     if player is not None:
+        # Record the turn as a player event. Without this, player_events stays
+        # empty, compaction never fires (it needs memory_compact_after), no
+        # dossier is ever built, and the whole player-memory tier reads from a
+        # table nothing fills -- which is exactly what happened until
+        # 2026-09-20.
+        #
+        # Every turn is recorded at low importance rather than trying to judge
+        # significance here: compaction is what distils these into a dossier of
+        # identity, allegiances, grudges and commitments, and it is better at
+        # that than a heuristic would be. Use memory_tool.py prune-events to
+        # trim the raw feedstock once it has been folded in.
+        record_player_event(
+            db,
+            player,
+            content=user_text,
+            kind="said",
+            importance=1,
+            conversation_id=convo.id if convo is not None else None,
+        )
         touch_last_seen(db, player)
 
     if convo is not None or player is not None:

@@ -114,6 +114,13 @@ class Settings(BaseModel):
     # empty to read stdout instead.
     cli_output_file_flag: str = os.getenv("CLI_OUTPUT_FILE_FLAG", "")
 
+    # How long to remember that a CLI invocation failed, so an unreleased
+    # model listed in CLI_MODELS is not re-probed on every message. Measured
+    # ~2s per probe against a nonexistent model -- paid on every reply without
+    # this. A newly released model is then picked up within one TTL rather
+    # than instantly, which is a good trade for seconds off every turn.
+    cli_miss_ttl: int = int(os.getenv("CLI_MISS_TTL", 900))
+
     # --- Memory --------------------------------------------------------------
     # Prompt cost must stay flat as conversations grow. See api/memory.py.
     memory_enabled: bool = os.getenv("MEMORY_ENABLED", "true").strip().lower() in (
