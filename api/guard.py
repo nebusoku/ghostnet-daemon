@@ -80,6 +80,23 @@ _MATH_WORDY = re.compile(
     r"|(?:what(?:'s|\s+is)|whats)\s+\d+\s*(?:plus|minus|times|divided\s+by)\s*\d+"
     r"|solve\s+(?:this|the\s+following|for\s+[a-z]\b)"
     r"|do\s+the\s+math"
+
+    # Geometry word-problems. Added after a live miss on 2026-09-20:
+    # "can you tell me the circumference of a circle with a radius of 2in"
+    # sailed past every pattern above and got answered (12.566in).
+    # These terms are effectively never casual in-world speech, unlike
+    # "area" or "radius" alone -- "the radius of the blast" is good prose,
+    # so bare "radius" is deliberately NOT matched.
+    r"|circumference|hypotenuse"
+    r"|\b(?:area|volume|perimeter)\s+of\s+(?:an?\s+|the\s+)?"
+    r"(?:circle|square|triangle|rectangle|sphere|cube|cylinder|hexagon|polygon)"
+    r"|\b(?:radius|diameter)\s+of\s+\d"
+
+    # Unit conversion.
+    r"|\bconvert\s+[\d.]+\s*\w+\s+(?:to|into)\b"
+    r"|how\s+many\s+(?:inches|feet|yards|miles|meters|metres|centimet(?:er|re)s|"
+    r"millimet(?:er|re)s|kilomet(?:er|re)s|grams|kilograms|ounces|pounds|"
+    r"litres|liters|gallons|seconds|minutes|hours)\b"
     r")",
     re.IGNORECASE,
 )

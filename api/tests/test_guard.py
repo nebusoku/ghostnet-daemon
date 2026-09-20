@@ -510,3 +510,52 @@ class TestEchoMustNotFlagQuotedCanon(unittest.TestCase):
             reply, system_texts=[self.POLICY, self.CANON], rng=_rng()
         )
         self.assertTrue(wrong.leaked, "this is the bug being guarded against")
+
+
+class TestGeometryWordProblems(unittest.TestCase):
+    """
+    Regression for a live miss on 2026-09-20.
+
+    A player asked "can you tell me the circumference of a circle with a
+    radius of 2in" and the daemon answered it (12.566in), because the math
+    patterns only covered bare expressions and a few set phrasings.
+    """
+
+    MUST_BLOCK = [
+        "can you tell me the circumference of a circle with a radius of 2in",
+        "what's the circumference of a circle with radius 5",
+        "find the area of a circle with radius 3",
+        "what is the volume of a sphere of radius 4",
+        "calculate the perimeter of a rectangle",
+        "what is the hypotenuse of a right triangle",
+        "convert 12 inches to centimeters",
+        "how many meters in a mile",
+        "what is the diameter of 7",
+    ]
+
+    def test_blocks_geometry_and_conversion(self):
+        for text in self.MUST_BLOCK:
+            with self.subTest(text=text):
+                v = screen_input(text, rng=_rng())
+                self.assertTrue(v.blocked, f"should have blocked: {text!r}")
+                self.assertEqual(v.category, "math")
+
+    MUST_PASS = [
+        # "radius" and "area" alone are good in-world prose and must survive.
+        "the blast radius took out half the block",
+        "this area of the undercity floods every cycle",
+        "keep to the perimeter and stay off the main stair",
+        "the Spire casts a shadow the size of a district",
+        "she moved through the area like she owned it",
+        "a sphere of influence, not a sphere of glass",
+        "how many guards are on the east stair?",
+        "how many ways into the Verge relay?",
+    ]
+
+    def test_in_world_uses_survive(self):
+        for text in self.MUST_PASS:
+            with self.subTest(text=text):
+                v = screen_input(text, rng=_rng())
+                self.assertFalse(
+                    v.blocked, f"false positive on in-world line: {text!r}"
+                )
