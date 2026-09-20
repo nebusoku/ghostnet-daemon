@@ -56,6 +56,13 @@ class Settings(BaseModel):
                                          "https://openrouter.ai/api/v1")
     openrouter_api_key: str = os.getenv("OPENROUTER_API_KEY", "")
     openrouter_model: str = os.getenv("OPENROUTER_MODEL", "")
+    # Ordered fallback list. Individual free models get rate-limited UPSTREAM
+    # (the provider behind them, not your account) -- observed as
+    # "google/gemma-4-31b-it:free is temporarily rate-limited upstream" while
+    # the account still had 49 of 50 daily requests left. Stacking models and
+    # falling through turns a transient 429 into a retry on another model.
+    # Comma-separated; falls back to OPENROUTER_MODEL when unset.
+    openrouter_models: str = os.getenv("OPENROUTER_MODELS", "")
     # Optional attribution headers OpenRouter uses for ranking.
     openrouter_referer: str = os.getenv("OPENROUTER_REFERER", "")
     openrouter_title: str = os.getenv("OPENROUTER_TITLE", "")

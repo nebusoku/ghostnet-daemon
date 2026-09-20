@@ -108,8 +108,32 @@ class Provider:
         return f"{self.name}:{self.model or '(unset)'}"
 
 
+def _openrouter_models() -> List[str]:
+    """Ordered OpenRouter model ids, falling back to the single-model setting."""
+    raw = (settings.openrouter_models or "").strip()
+    if raw:
+        return [m.strip() for m in raw.split(",") if m.strip()]
+    return [settings.openrouter_model] if settings.openrouter_model else []
+
+
 def _provider(name: str) -> Provider:
     name = (name or "").strip().lower()
+
+    # "openrouter#<model>" addresses one specific model. resolve_chain()
+    # expands a bare "openrouter" into one of these per configured model, so
+    # an upstream 429 on one model falls through to the next using the same
+    # failover loop that handles whole providers.
+    if name.startswith("openrouter#"):
+        model = name.split("#", 1)[1]
+        p = _provider("openrouter")
+        return Provider(
+            name=f"openrouter[{model}]",
+            kind=p.kind,
+            model=model,
+            base_url=p.base_url,
+            api_key=p.api_key,
+            headers=p.headers,
+        )
 
     if name == "ollama":
         return Provider(
@@ -150,11 +174,29 @@ def _provider(name: str) -> Provider:
 
 
 def resolve_chain() -> List[str]:
-    """Ordered provider names from LLM_CHAIN, falling back to LLM_BACKEND."""
+    """
+    Ordered provider names from LLM_CHAIN, falling back to LLM_BACKEND.
+
+    A bare "openrouter" expands into one entry per configured model, so a
+    chain of "openai,openrouter,ollama" with three OpenRouter models becomes
+    five links. Free models are rate-limited upstream independently of each
+    other, so trying the next model is usually enough to get served.
+    """
     raw = (settings.llm_chain or "").strip()
     if not raw:
         raw = settings.llm_backend or "ollama"
-    names = [p.strip().lower() for p in raw.split(",") if p.strip()]
+
+    names: List[str] = []
+    for part in raw.split(","):
+        p = part.strip().lower()
+        if not p:
+            continue
+        if p == "openrouter":
+            models = _openrouter_models()
+            names.extend(f"openrouter#{m}" for m in models) if models else names.append(p)
+        else:
+            names.append(p)
+
     return names or ["ollama"]
 
 
