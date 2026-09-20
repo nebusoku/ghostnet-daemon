@@ -7,7 +7,13 @@ from discord import app_commands
 from discord.ext import tasks
 import requests
 
-from config import DISCORD_TOKEN, PRIMARY_GUILD_ID, BACKEND_URL, get_headers
+from config import (
+    DISCORD_TOKEN,
+    PRIMARY_GUILD_ID,
+    BACKEND_URL,
+    CHAT_TIMEOUT,
+    get_headers,
+)
 from helpers import check_health, check_deep_health, sync_player
 from channels import get_servercontrol_channel, get_heartbeat_channel
 from presence import update_presence_from_health
@@ -347,7 +353,7 @@ async def on_message(message: discord.Message):
                 f"{BACKEND_URL}/chat",
                 json=payload,
                 headers=get_headers(),
-                timeout=90,
+                timeout=CHAT_TIMEOUT,
             )
         resp.raise_for_status()
         data = resp.json()
