@@ -26,7 +26,17 @@ class Settings(BaseModel):
     openai_model: str = os.getenv("OPENAI_MODEL", "")
 
     # Shared generation tuning (applies to whichever backend is selected)
+    # gen_timeout is sized for SLOW LOCAL generation: a canon-sized prompt
+    # costs ~57s of prompt evaluation on this host before the first token.
     gen_timeout: int = int(os.getenv("GEN_TIMEOUT", 120))
+
+    # Hosted providers get a much tighter per-link bound. With a deep model
+    # stack, gen_timeout applied per link would let one hung provider stall
+    # the chain for minutes. Rate-limited links return in well under a second,
+    # so even a 20-deep chain of 429s costs only a few seconds before the
+    # local floor is reached.
+    hosted_timeout: int = int(os.getenv("HOSTED_TIMEOUT", 60))
+
     max_output_tokens: int = int(os.getenv("MAX_OUTPUT_TOKENS", 512))
     num_ctx: int = int(os.getenv("NUM_CTX", 8192))
 

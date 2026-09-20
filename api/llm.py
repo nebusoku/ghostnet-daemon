@@ -39,6 +39,9 @@ it is the slowest and weakest and should never be reached first.
 
 from __future__ import annotations
 
+import asyncio
+import re
+import shlex
 from dataclasses import dataclass, field
 from typing import List, Optional
 
@@ -368,7 +371,7 @@ async def _generate_openai_compatible(
         "stream": False,
     }
 
-    r = await http.post(url, json=body, headers=headers, timeout=settings.gen_timeout)
+    r = await http.post(url, json=body, headers=headers, timeout=settings.hosted_timeout)
 
     # Newer OpenAI model families reject `max_tokens` (requiring
     # `max_completion_tokens`) and some reject a non-default temperature. Both
@@ -389,7 +392,7 @@ async def _generate_openai_compatible(
             print(f"[llm] {p.name}: retrying with adjusted params after 400: "
                   f"{detail[:160]}", flush=True)
             r = await http.post(url, json=retry, headers=headers,
-                                timeout=settings.gen_timeout)
+                                timeout=settings.hosted_timeout)
 
     if r.status_code in _FAILOVER_STATUS:
         raise ProviderUnavailable(f"{p.name} returned {r.status_code}: {r.text[:200]}")
