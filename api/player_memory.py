@@ -36,6 +36,7 @@ from sqlalchemy.orm import Session
 
 from .memory import estimate_tokens
 from .models import Player, PlayerEvent, PlayerMemory, WorldEvent
+from .db import utcnow
 from .settings import settings
 
 __all__ = [
@@ -117,7 +118,7 @@ def record_world_event(
 def touch_last_seen(db: Session, player: Player) -> None:
     """Mark the player present now. Drives the absence digest on their return."""
     pm = get_or_create_player_memory(db, player)
-    pm.last_seen_at = datetime.utcnow()
+    pm.last_seen_at = utcnow()
     db.flush()
 
 
@@ -141,7 +142,7 @@ def _absence_digest(
     if pm.last_seen_at is None:
         return None
 
-    gap = datetime.utcnow() - pm.last_seen_at
+    gap = utcnow() - pm.last_seen_at
     if gap.total_seconds() < settings.memory_absence_seconds:
         return None
 

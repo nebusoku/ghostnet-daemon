@@ -37,6 +37,7 @@ import httpx
 from sqlalchemy.orm import Session
 
 from .models import Conversation, Message
+from .db import utcnow
 from .settings import settings
 
 __all__ = [
@@ -150,7 +151,7 @@ def record_message(
         meta=meta,
     )
     db.add(msg)
-    convo.updated_at = datetime.utcnow()
+    convo.updated_at = utcnow()
     db.flush()
     return msg
 

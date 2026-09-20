@@ -11,7 +11,7 @@ from sqlalchemy import (
     JSON,
 )
 from sqlalchemy.orm import relationship
-from .db import Base
+from .db import Base, utcnow
 
 class Conversation(Base):
     """
@@ -25,8 +25,8 @@ class Conversation(Base):
     title = Column(String, nullable=True)
 
     world_state = Column(JSON, nullable=True)                 # avatar/faction/etc
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow)
+    updated_at = Column(DateTime, default=utcnow)
 
     messages = relationship(
         "Message",
@@ -49,7 +49,7 @@ class Message(Base):
     model = Column(String, nullable=True)
     meta = Column("metadata", JSON, nullable=True)
 
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow)
 
     conversation = relationship("Conversation", back_populates="messages")
 
@@ -76,8 +76,8 @@ class WorldDocument(Base):
 
     qdrant_point_id = Column(String, nullable=True, index=True)
 
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow)
+    updated_at = Column(DateTime, default=utcnow)
 
 from datetime import datetime
 from sqlalchemy import (
@@ -115,12 +115,12 @@ class Player(Base):
     # JSON-encoded list of alias strings (Tupperbox names, RP aliases, etc.)
     aliases = Column(Text, nullable=False, default="[]")
 
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=utcnow)
     updated_at = Column(
         DateTime,
         nullable=False,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        default=utcnow,
+        onupdate=utcnow,
     )
 
 class Entity(Base):
@@ -137,8 +137,8 @@ class Entity(Base):
     summary = Column(Text, nullable=True)
     data = Column(JSON, nullable=True)          # arbitrary structured info (stats, tags, etc.)
 
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow)
+    updated_at = Column(DateTime, default=utcnow)
 
 
 class PlayerMemory(Base):
@@ -165,8 +165,8 @@ class PlayerMemory(Base):
     # Watermark: events at/below this id are already folded into `dossier`.
     summarised_through_event_id = Column(Integer, default=0, nullable=False)
 
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
 
 
 class PlayerEvent(Base):
@@ -191,7 +191,7 @@ class PlayerEvent(Base):
     importance = Column(Integer, default=2, nullable=False, index=True)
 
     conversation_id = Column(Integer, ForeignKey("conversations.id"), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    created_at = Column(DateTime, default=utcnow, index=True)
 
 
 class WorldEvent(Base):
@@ -212,5 +212,5 @@ class WorldEvent(Base):
     faction = Column(String, nullable=True, index=True)
     importance = Column(Integer, default=2, nullable=False, index=True)
 
-    occurred_at = Column(DateTime, default=datetime.utcnow, index=True)
+    occurred_at = Column(DateTime, default=utcnow, index=True)
     created_by = Column(String, nullable=True)   # daemon / gm / system

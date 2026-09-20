@@ -1,4 +1,5 @@
 # api/db.py
+from datetime import datetime, timezone
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 
@@ -32,3 +33,15 @@ def init_db() -> None:
     from . import models  # noqa: F401  (register model classes on Base)
 
     Base.metadata.create_all(bind=engine)
+
+
+def utcnow() -> datetime:
+    """
+    Naive UTC "now", replacing the deprecated datetime.utcnow().
+
+    Deliberately naive: the timestamp columns are TIMESTAMP WITHOUT TIME
+    ZONE, and mixing an aware value with the naive ones already stored
+    raises TypeError on subtraction -- which would break the absence-digest
+    arithmetic in api/player_memory.py.
+    """
+    return datetime.now(timezone.utc).replace(tzinfo=None)

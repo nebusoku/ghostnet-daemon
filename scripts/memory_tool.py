@@ -45,7 +45,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sqlalchemy import func, or_  # noqa: E402
 
-from api.db import SessionLocal  # noqa: E402
+from api.db import SessionLocal, utcnow  # noqa: E402
 from api.models import (  # noqa: E402
     Conversation,
     Message,
@@ -261,7 +261,7 @@ def cmd_player(db, args) -> None:
     else:
         seen = pm.last_seen_at
         if seen:
-            gap = datetime.utcnow() - seen
+            gap = utcnow() - seen
             days = gap.total_seconds() / 86400
             away = (f"  ({days:.1f} days ago -- absence digest WOULD fire)"
                     if gap.total_seconds() >= settings.memory_absence_seconds
@@ -320,7 +320,7 @@ def cmd_purge_deflected(db, args) -> None:
     context. Once you have seen the pattern, they are just rows.
     """
     rule("PURGE DEFLECTED TURNS")
-    cutoff = datetime.utcnow() - timedelta(days=args.older_than_days)
+    cutoff = utcnow() - timedelta(days=args.older_than_days)
 
     victims = []
     for m in db.query(Message).filter(Message.meta.isnot(None)):
@@ -347,7 +347,7 @@ def cmd_purge_deflected(db, args) -> None:
 def cmd_prune_events(db, args) -> None:
     """Drop old, low-importance player events that no dossier needs."""
     rule("PRUNE PLAYER EVENTS")
-    cutoff = datetime.utcnow() - timedelta(days=args.older_than_days)
+    cutoff = utcnow() - timedelta(days=args.older_than_days)
 
     q = (
         db.query(PlayerEvent)
