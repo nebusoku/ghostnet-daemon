@@ -1,3 +1,4 @@
+import json
 from typing import List, Optional
 
 import httpx
@@ -143,6 +144,32 @@ def force_mature_all() -> bool:
 
         return _env_truthy(os.getenv("FORCE_MATURE_ALL", "false"))
     return bool(v)
+
+
+def aliases_to_db(values) -> str:
+    """
+    Serialise aliases for the Text column as JSON.
+
+    Assigning a Python list directly lets psycopg2 adapt it to a Postgres
+    ARRAY literal -- production rows contain the string "{}" -- and reading
+    that back through list() yields ["{", "}"], i.e. two junk aliases per
+    player. Store JSON explicitly instead. The column stays Text, so no
+    migration is needed.
+    """
+    return json.dumps([str(v) for v in (values or [])])
+
+
+def aliases_from_db(raw) -> List[str]:
+    """Decode aliases, tolerating the legacy "{}" and plain-list values."""
+    if isinstance(raw, list):
+        return [str(v) for v in raw]
+    if not raw:
+        return []
+    try:
+        parsed = json.loads(raw)
+    except (TypeError, ValueError):
+        return []
+    return [str(v) for v in parsed] if isinstance(parsed, list) else []
 
 
 def trim(s: str, n: int) -> str:
@@ -579,7 +606,7 @@ async def upsert_player(
 
     # These are safe to overwrite
     obj.is_npc = bool(player.is_npc)
-    obj.aliases = list(player.aliases or [])
+    obj.aliases = aliases_to_db(player.aliases)
 
     # Mature flag: only set when explicitly provided
     if getattr(player, "mature_ok", None) is not None:
@@ -595,7 +622,7 @@ async def upsert_player(
         display_name=obj.display_name,
         avatar_url=obj.avatar_url,
         is_npc=obj.is_npc,
-        aliases=list(obj.aliases or []),
+        aliases=aliases_from_db(obj.aliases),
         mature_ok=bool(getattr(obj, "mature_ok", False)),
     )
 
@@ -617,7 +644,7 @@ async def get_player(
         display_name=obj.display_name,
         avatar_url=obj.avatar_url,
         is_npc=obj.is_npc,
-        aliases=list(obj.aliases or []),
+        aliases=aliases_from_db(obj.aliases),
         mature_ok=bool(getattr(obj, "mature_ok", False)),
     )
 
@@ -649,7 +676,7 @@ async def find_players_by_handle(
             display_name=o.display_name,
             avatar_url=o.avatar_url,
             is_npc=o.is_npc,
-            aliases=list(o.aliases or []),
+            aliases=aliases_from_db(o.aliases),
             mature_ok=bool(getattr(o, "mature_ok", False)),
         )
         for o in objs
