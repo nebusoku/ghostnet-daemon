@@ -124,7 +124,16 @@ async def search_similar(
         limit=top_k,
         with_payload=True,
     )
-    return [(p.payload.get("text", ""), float(p.score)) for p in res]
+    # The two ingest paths write the searchable content under DIFFERENT keys:
+    #   upsert_texts()           -> payload["text"]   (generic /ingest)
+    #   upsert_world_documents() -> payload["body"]   (structured world docs)
+    # Reading only "text" returned an empty string for every structured
+    # document -- 23 of 26 live points. Retrieval looked like it was working
+    # (scores came back fine) while delivering no content at all.
+    return [
+        (p.payload.get("text") or p.payload.get("body") or "", float(p.score))
+        for p in res
+    ]
 
 
 # --------- World-document specific RAG --------- #

@@ -15,6 +15,21 @@ class ChatRequest(BaseModel):
     messages: List[ChatMessage]
     system: Optional[str] = None
     rag: bool = True
+    # In-world integrity screening (see api/guard.py). Defaults on, so any
+    # caller that omits the field is guarded. Internal generators that build
+    # their own prompts (e.g. /gn arc) may set this false.
+    guard: bool = True
+
+    # --- Memory binding (both optional; omit for stateless behaviour) ------
+    # Scene memory: the Discord channel/thread id. Groups turns into one
+    # continuing scene.
+    conversation_id: Optional[str] = None
+    source: str = "discord"
+    # Player memory: the acting player's Discord user id. This is the identity
+    # the world tracks -- it persists across channels, display-name changes and
+    # long absences, which is what lets players come and go without the world
+    # stopping for them.
+    discord_id: Optional[str] = None
 
 
 class ChatResponse(BaseModel):

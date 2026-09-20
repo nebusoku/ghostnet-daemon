@@ -8,8 +8,5 @@ numpy==2.1.2
 sqlalchemy==2.0.36
 discord.py==2.3.2
 requests==2.32.3
-<<<<<<< HEAD
 zipp>=3.19.1 # not directly required, pinned by Snyk to avoid a vulnerability
-=======
-zipp==3.19.1
->>>>>>> 515e071 (Stabilize ghostnet stack: API + Discord on server, mac mini replaced)
+psycopg2-binary==2.9.9

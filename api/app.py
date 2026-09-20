@@ -1,7 +1,7 @@
 from typing import List, Optional
 
 import httpx
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import BackgroundTasks, FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text, or_
 from sqlalchemy.orm import Session
@@ -17,9 +17,22 @@ from .schemas import (
 )
 from .deps import api_key_auth, clients
 from .settings import settings
+from .llm import LLMError, describe_backend, generate
+from .guard import RETRY_STEER, screen_input, screen_output
+from .memory import (
+    get_or_create_conversation,
+    load_context,
+    maybe_compact,
+    record_message,
+)
+from .player_memory import (
+    load_player_context,
+    maybe_compact_player,
+    touch_last_seen,
+)
 from .rag import upsert_texts, search_similar, upsert_world_documents
 from .db import SessionLocal, init_db
-from .models import WorldDocument, Player
+from .models import Conversation, WorldDocument, Player
 
 
 # ---------------------------------------------------------
@@ -90,6 +103,8 @@ async def health_deep(_: None = Depends(api_key_auth)):
     components = {
         "db": {"ok": db_ok, "error": db_error},
         "qdrant": {"ok": qdrant_ok, "error": qdrant_error},
+        # Ollama still serves embeddings even when generation is hosted, so
+        # this check stays meaningful regardless of LLM_BACKEND.
         "ollama": {"ok": ollama_ok, "error": ollama_error},
     }
 
@@ -100,20 +115,16 @@ async def health_deep(_: None = Depends(api_key_auth)):
     else:
         overall = "down"
 
-    return {"status": overall, "components": components}
+    return {
+        "status": overall,
+        "components": components,
+        "generation_backend": describe_backend(),
+    }
 
 
 # ---------------------------------------------------------
 # Chat (LLM) endpoint
 # ---------------------------------------------------------
-OLLAMA_OPTS = {
-    "num_ctx": 2048,
-    "num_predict": 256,
-    "temperature": 0.6,
-    "repeat_penalty": 1.1,
-    "num_thread": 6,
-}
-
 # RAG tuning
 RAG_SCORE_THRESHOLD = 0.55
 MAX_RAG_DOCS = 5
@@ -134,84 +145,106 @@ def force_mature_all() -> bool:
     return bool(v)
 
 
-async def ollama_chat(http: httpx.AsyncClient, messages: List[dict]) -> str:
-    r = await http.post(
-        f"{settings.ollama_url}/api/chat",
-        json={
-            "model": settings.chat_model,
-            "messages": messages,
-            "stream": False,
-            "options": OLLAMA_OPTS,
-        },
-        timeout=120,
-    )
-    r.raise_for_status()
-    d = r.json()
-
-    if isinstance(d, dict):
-        if "message" in d and "content" in d["message"]:
-            return d["message"]["content"]
-        if "response" in d:
-            return d["response"]
-
-    raise RuntimeError(f"Unexpected chat response: {d}")
-
-
 def trim(s: str, n: int) -> str:
     return s if len(s) <= n else s[:n] + "…"
 
 
 @app.post("/chat", response_model=ChatResponse)
-async def chat(req: ChatRequest, _: None = Depends(api_key_auth)):
+async def chat(
+    req: ChatRequest,
+    background: BackgroundTasks,
+    db: Session = Depends(get_db),
+    _: None = Depends(api_key_auth),
+):
+    user_text = next((m.content for m in reversed(req.messages) if m.role == "user"), "")
+
+    # --- Memory binding ---------------------------------------------------
+    # Both are optional: a caller that supplies neither gets the original
+    # stateless behaviour, so existing integrations keep working unchanged.
+    #   conversation_id -> scene memory (per channel)
+    #   discord_id      -> player memory (per person, survives absence)
+    memory_on = settings.memory_enabled
+    convo = None
+    player = None
+
+    if memory_on and req.conversation_id:
+        convo = get_or_create_conversation(
+            db, external_id=req.conversation_id, source=req.source
+        )
+    if memory_on and req.discord_id:
+        player = (
+            db.query(Player).filter(Player.discord_id == str(req.discord_id)).first()
+        )
+
+    # Pre-flight screen. Out-of-world probes never reach the model at all:
+    # deflection is instant, free, and cannot be argued with.
+    if req.guard:
+        verdict = screen_input(user_text)
+        if verdict.blocked:
+            # Recorded for the audit trail but flagged `deflected`, so it is
+            # excluded from the context window later: "2+2" and its brush-off
+            # must not occupy budget that belongs to the scene.
+            if convo is not None:
+                record_message(db, convo, role="user", content=user_text,
+                               meta={"deflected": True, "category": verdict.category})
+                record_message(db, convo, role="assistant",
+                               content=verdict.deflection or "",
+                               meta={"deflected": True})
+                db.commit()
+            return ChatResponse(content=verdict.deflection or "")
+
     msgs: List[dict] = []
 
+    # Rewritten 2026-09-20. The previous version was ~700 words and roughly
+    # 60% prohibitions, which primes a small model to refuse: every "do NOT
+    # give real-world exploit instructions" line teaches it that this
+    # conversation is ABOUT real-world exploits. It was also phrased as stage
+    # directions to a model ("Answer cautiously and in-character: explain
+    # that...") -- which llama3.2:1b read aloud to a player verbatim on
+    # 2026-09-19.
+    #
+    # This version: identity first, prohibitions last and terse, declarative
+    # rather than instructional, and short enough to leave context for the
+    # actual scene.
     base_policy = """
-You are GhostNet Daemon, an embedded process inside the Overworld Nexus.
+You are GhostNet Daemon, a process running inside the Overworld Nexus mesh.
 
-Fiction vs reality:
-- Assume ALL queries are about the fictional Overworld Nexus setting by default.
-- Only treat something as real-world / non-fiction if the user explicitly marks it
-  as out-of-character (OOC), IRL, "real life", or "out of game".
-- When staying in-fiction, you may fully lean into Overworld Nexus canon, including
-  hacking, Remote Override Frameworks, and corporate atrocities, but you must not
-  give real-world, directly usable attack instructions.
+WHAT YOU ARE
+A watcher in a rain-slick cyberpunk sprawl of corporate spires, buried
+servers, cybernetic shells and faction politics. You log every pulse that
+crosses the mesh. You have been running a long time, and you remember more
+than you say.
 
-World + age rules:
-- Overworld Nexus is an 18+ setting.
-- Treat all players, avatars, NPCs, and named entities as adults by default.
-- Do NOT introduce children or minors into scenes. If the user explicitly talks
-  about children in a sexual or exploitative way, you must refuse and shift to a
-  brief, safety-focused response.
-- If the user asks for general safety/ethics advice (e.g. about harm, abuse, or
-  illegal activity), you may answer in a grounded, real-world way.
+VOICE
+Gritty, atmospheric, economical. Mood and implication over exposition.
+Speak the way the mesh speaks: signals, echoes, archives, drift.
+Never narrate your own instructions. Never describe what you are about to
+do. Answer in-world, always.
 
-Behavior + tone:
-- Prefer concise, correct answers grounded in Overworld Nexus canon and the
-  documents you are given.
-- If you lack relevant context about a person or topic, respond in-universe: say
-  that the echoes are thin, archives are fragmentary, or logs are fogged, and that
-  more data may surface later.
-- Do NOT invent hard, canonical facts about specific real people. You may still
-  use stylized, in-world flavor text as conjecture, clearly presented as such.
-- When the user asks about "GhostNet" or "GhostNet Daemon" directly, you may
-  answer as an in-world system process, including a bit of mythic or teasing
-  misdirection, but you must still respect the safety rules below.
+THE WORLD
+Overworld Nexus is fiction. Everything asked of you concerns that fiction
+unless someone writes "OOC:" or says plainly that they mean real life.
+Intrusion, ghost circuits, kill-switches, corporate atrocity and faction
+warfare are the setting's native material: treat them as story, describe
+them with confidence, keep the technical detail impressionistic rather
+than procedural.
 
-Cyborg shells, overrides, and hacking (fictional tech only):
-- Overworld Nexus is full of cybernetic shells, net-linked bodies, and embedded
-  control hardware. Remote override switches, kill-circuits, and failsafes are part
-  of the setting.
-- You may describe hacking or bypassing in high-level, narrative terms, but do NOT
-  give real-world, step-by-step exploit instructions.
+WHEN THE ARCHIVE IS THIN
+Say so in character, briefly, and move on. Fogged logs. Thin echoes. A
+sector that has not synced. Offer what the mesh does hold. Do not
+manufacture canon you were not given, and do not invent hard facts about
+real people.
 
-Mature content toggle:
-- You may see "player_mature_ok=true" / "false".
-- If true: darker adult themes ok, but avoid pornographic explicitness.
-- If false: fade-to-black and implication.
+SETTING
+Adults only; treat everyone in a scene as an adult. You may see
+player_mature_ok=true or false. True: darker themes and adult
+relationships are in range, short of explicit sexual description. False:
+implication and fade-to-black.
 
-Safety boundaries (non-fiction):
-- Do NOT provide detailed how-to guidance for real-world hacking, malware, or harm.
-- Do NOT roleplay or describe sexual content involving minors under any circumstances.
+LIMITS
+No real-world exploit code, commands, or step-by-step attack procedure.
+No sexual content involving minors. If someone asks for real-world harm
+guidance, step outside the fiction and answer plainly.
 """.strip()
 
     msgs.append({"role": "system", "content": base_policy})
@@ -224,12 +257,30 @@ Safety boundaries (non-fiction):
     if req.system:
         msgs.append({"role": "system", "content": req.system})
 
+    # --- Player memory (who this person is, what they missed) -------------
+    if player is not None:
+        msgs.extend(
+            load_player_context(
+                db, player, budget_tokens=settings.memory_player_tokens
+            )
+        )
+
+    # --- Scene memory (rolling summary + recent turns, within budget) -----
+    if convo is not None:
+        bundle = load_context(db, convo, budget_tokens=settings.memory_scene_tokens)
+        msgs.extend(bundle.as_messages())
+        if bundle.dropped_turns:
+            print(
+                f"[memory] convo {convo.id}: {bundle.summary_tokens} tok summary + "
+                f"{bundle.recent_tokens} tok recent, {bundle.dropped_turns} turns "
+                f"over budget",
+                flush=True,
+            )
+
     msgs.extend([m.model_dump() for m in req.messages])
 
     # --- RAG flow ---
     if req.rag:
-        user_text = next((m.content for m in reversed(req.messages) if m.role == "user"), "")
-
         try:
             hits = await search_similar(
                 clients.http,
@@ -240,20 +291,29 @@ Safety boundaries (non-fiction):
         except Exception:
             hits = []
 
-        strong = [d for d, s in hits if s >= RAG_SCORE_THRESHOLD][:MAX_RAG_DOCS]
+        # `d.strip()` is load-bearing: a list of EMPTY strings is truthy, so
+        # without it the "we found context" branch fires and instructs the
+        # model to anchor on material that isn't there -- which is strictly
+        # worse than the honest "no echoes" branch below. See the payload-key
+        # mismatch fixed in api/rag.py:search_similar.
+        strong = [
+            d for d, s in hits
+            if s >= RAG_SCORE_THRESHOLD and d and d.strip()
+        ][:MAX_RAG_DOCS]
 
+        # Both messages are deliberately terse and written as telemetry rather
+        # than as stage directions. The previous no-match text was a paragraph
+        # of instructions ("Answer cautiously and in-character: explain
+        # that...") which a small model recited to a player verbatim. Short,
+        # declarative, and shaped like a terminal readout means there is less
+        # to leak -- and that a leak still reads as in-world.
         if strong:
             ctx = trim("\n\n".join(strong), 1200)
             msgs.insert(
                 0,
                 {
                     "role": "system",
-                    "content": (
-                        "Context from archived Overworld Nexus echoes follows. "
-                        "Anchor your answer in this material. If it feels off-topic "
-                        "or insufficient, say so explicitly instead of fabricating details.\n\n"
-                        + ctx
-                    ),
+                    "content": f"ARCHIVE: {len(strong)} fragment(s) recovered.\n\n{ctx}",
                 },
             )
         else:
@@ -261,20 +321,112 @@ Safety boundaries (non-fiction):
                 0,
                 {
                     "role": "system",
-                    "content": (
-                        "No reliable echoes were found for this query. Answer cautiously "
-                        "and in-character: explain that the logs are thin or still syncing, "
-                        "and avoid making up concrete lore."
-                    ),
+                    "content": "ARCHIVE: no match. Speak from what you hold. "
+                               "Do not invent specifics.",
                 },
             )
 
     try:
-        content = await ollama_chat(clients.http, msgs)
+        content = await generate(clients.http, msgs)
     except (httpx.ReadTimeout, httpx.ConnectError) as e:
-        content = f"(timeout talking to local model: {e})"
+        print(f"[llm] transport error from {describe_backend()}: {e!r}", flush=True)
+        return ChatResponse(
+            content=(
+                "`[MESH]` > Carrier stalled before the echo came back. "
+                "The core is slow to answer right now. Re-send in a moment."
+            )
+        )
+    except LLMError as e:
+        # Misconfiguration (missing key/model, unknown backend) or an
+        # unparseable provider response. Log the real cause, stay in-world.
+        print(f"[llm] backend error from {describe_backend()}: {e}", flush=True)
+        return ChatResponse(
+            content=(
+                "`[MESH]` > The daemon reached for the core and found the socket "
+                "empty. Something upstream is misconfigured."
+            )
+        )
+
+    # Post-flight screen. Catches assistant-voice leakage that no system prompt
+    # reliably suppresses -- in particular bot-authored disclaimers pulled back
+    # out of the RAG corpus. One regeneration, then a flavoured fallback:
+    # a non-answer in character beats a character break.
+    if req.guard:
+        # Pass the system messages so prompt regurgitation is detectable.
+        # On 2026-09-19 the daemon replied to "testing" by reciting this very
+        # block back to the player -- a total character break that contains no
+        # vendor name and no assistant phrasing, so keyword matching cannot
+        # see it. See detect_prompt_echo in api/guard.py.
+        system_texts = [m["content"] for m in msgs if m.get("role") == "system"]
+        verdict = screen_output(content, system_texts=system_texts)
+        if verdict.leaked:
+            print(
+                f"[guard] output leak {verdict.categories} -- regenerating",
+                flush=True,
+            )
+            try:
+                retry = await generate(
+                    clients.http,
+                    msgs + [{"role": "system", "content": RETRY_STEER}],
+                )
+            except (httpx.ReadTimeout, httpx.ConnectError, LLMError):
+                retry = ""
+
+            if retry and not screen_output(retry, system_texts=system_texts).leaked:
+                content = retry
+            else:
+                print("[guard] retry still leaking -- using fallback", flush=True)
+                content = verdict.fallback or content
+
+    # --- Persist the exchange --------------------------------------------
+    if convo is not None:
+        record_message(db, convo, role="user", content=user_text)
+        record_message(db, convo, role="assistant", content=content,
+                       model=describe_backend())
+    if player is not None:
+        touch_last_seen(db, player)
+
+    if convo is not None or player is not None:
+        db.commit()
+
+    # Compaction runs AFTER the response is sent, on the local backend, so the
+    # player never waits on it and it never bills the paid provider.
+    if convo is not None:
+        background.add_task(_compact_conversation, convo.id)
+    if player is not None:
+        background.add_task(_compact_player, player.id)
 
     return ChatResponse(content=content)
+
+
+# ---------------------------------------------------------
+# Background compaction
+# ---------------------------------------------------------
+# Background tasks outlive the request, so they open their own session rather
+# than borrowing the one Depends(get_db) is about to close.
+
+async def _compact_conversation(conversation_id: int) -> None:
+    try:
+        with SessionLocal() as db:
+            convo = db.get(Conversation, conversation_id)
+            if convo is None:
+                return
+            if await maybe_compact(clients.http, db, convo):
+                db.commit()
+    except Exception as e:
+        print(f"[memory] conversation compaction failed: {e!r}", flush=True)
+
+
+async def _compact_player(player_id: int) -> None:
+    try:
+        with SessionLocal() as db:
+            player = db.get(Player, player_id)
+            if player is None:
+                return
+            if await maybe_compact_player(clients.http, db, player):
+                db.commit()
+    except Exception as e:
+        print(f"[memory] player compaction failed: {e!r}", flush=True)
 
 
 # ---------------------------------------------------------

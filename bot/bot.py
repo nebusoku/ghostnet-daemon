@@ -1,6 +1,5 @@
 # bot/bot.py
 import asyncio
-import re
 from typing import Any, Callable
 
 import discord
@@ -12,6 +11,7 @@ from config import DISCORD_TOKEN, PRIMARY_GUILD_ID, BACKEND_URL, get_headers
 from helpers import check_health, check_deep_health, sync_player
 from channels import get_servercontrol_channel, get_heartbeat_channel
 from presence import update_presence_from_health
+from chunking import DISCORD_SAFE_LEN, split_for_discord
 from commands import register_gn_commands
 
 print("🔥 GhostNet bot.py loaded and executing…", flush=True)
@@ -72,66 +72,11 @@ async def run_blocking(fn: Callable[..., Any], *args, **kwargs) -> Any:
 # -------------------------------------------------
 # Discord message chunking (daemon replies can exceed 2k chars)
 # -------------------------------------------------
-DISCORD_MAX_MESSAGE_LEN = 2000
-DISCORD_SAFE_LEN = 1900  # headroom for formatting / weird unicode edge cases
-
-_sentence_re = re.compile(r"(?<=[.!?])\s+")
-
-
-def split_text_sentence_chunks(text: str, limit: int = DISCORD_SAFE_LEN) -> list[str]:
-    """
-    Split text into <=limit chunks, rounding down to nearest sentence boundary.
-    Keeps order. Falls back to hard splitting if a single sentence exceeds limit.
-    """
-    text = (text or "").strip()
-    if not text:
-        return []
-
-    # Split on sentence-ending punctuation followed by whitespace.
-    sentences = _sentence_re.split(text)
-
-    chunks: list[str] = []
-    cur = ""
-
-    def flush():
-        nonlocal cur
-        if cur.strip():
-            chunks.append(cur.strip())
-        cur = ""
-
-    for s in sentences:
-        s = s.strip()
-        if not s:
-            continue
-
-        # If a single "sentence" is longer than limit, hard-split it.
-        if len(s) > limit:
-            flush()
-            start = 0
-            while start < len(s):
-                part = s[start : start + limit]
-                chunks.append(part)
-                start += limit
-            continue
-
-        # Add sentence to current chunk if it fits.
-        if not cur:
-            cur = s
-        elif len(cur) + 1 + len(s) <= limit:
-            cur = f"{cur} {s}"
-        else:
-            flush()
-            cur = s
-
-    flush()
-    return chunks
-
-
 async def send_discord_chunked(
     channel: discord.abc.Messageable, text: str, limit: int = DISCORD_SAFE_LEN
 ) -> None:
     """Send text in ordered chunks under Discord message limits."""
-    chunks = split_text_sentence_chunks(text, limit=limit)
+    chunks = split_for_discord(text, limit=limit)
     if not chunks:
         return
 
@@ -386,6 +331,14 @@ async def on_message(message: discord.Message):
     payload = {
         "system": mature_hint,
         "messages": [{"role": "user", "content": message.content}],
+        # Memory binding. The channel groups turns into a scene; the author id
+        # is the identity the world tracks across channels and absences.
+        # Only the newest turn is sent -- the API assembles history from its
+        # own store within a token budget, so prompt cost stays flat however
+        # long a scene runs.
+        "conversation_id": str(message.channel.id),
+        "discord_id": str(message.author.id),
+        "source": "discord",
     }
 
     try:

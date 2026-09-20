@@ -139,3 +139,78 @@ class Entity(Base):
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow)
+
+
+class PlayerMemory(Base):
+    """
+    Per-player rolling dossier, keyed to a Discord identity.
+
+    Scene memory (Conversation.world_state) is per-channel and dies with the
+    scene. This is per-PERSON and outlives it: a player can vanish for three
+    months, come back in a different channel, and the world still knows who
+    they are and what they did.
+
+    One row per player. The dossier is compacted, not appended, so a player
+    with two years of history costs the same per request as a new one.
+    """
+    __tablename__ = "player_memory"
+
+    id = Column(Integer, primary_key=True, index=True)
+    player_id = Column(Integer, ForeignKey("players.id"), unique=True, nullable=False, index=True)
+
+    dossier = Column(Text, nullable=True)          # compacted "who this is"
+    standing = Column(JSON, nullable=True)         # {"spire": -2, "choir": 1}
+
+    last_seen_at = Column(DateTime, nullable=True, index=True)
+    # Watermark: events at/below this id are already folded into `dossier`.
+    summarised_through_event_id = Column(Integer, default=0, nullable=False)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class PlayerEvent(Base):
+    """
+    Append-only log of things a player did that the world should remember.
+
+    Scored by importance so context assembly can select the most consequential
+    events rather than merely the most recent -- a faction betrayal six months
+    ago outranks yesterday's small talk, and selecting by importance keeps the
+    per-request cost bounded no matter how long someone has played.
+    """
+    __tablename__ = "player_events"
+
+    id = Column(Integer, primary_key=True, index=True)
+    player_id = Column(Integer, ForeignKey("players.id"), nullable=False, index=True)
+
+    world = Column(String, default="Overworld Nexus", index=True)
+    kind = Column(String, index=True)        # action / decision / relationship / arc
+    content = Column(Text, nullable=False)
+
+    # 1 = incidental, 5 = world-altering. Drives selection under a token budget.
+    importance = Column(Integer, default=2, nullable=False, index=True)
+
+    conversation_id = Column(Integer, ForeignKey("conversations.id"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+
+class WorldEvent(Base):
+    """
+    Things that happened to the world itself, independent of any player.
+
+    This is what lets the world keep moving while someone is away: on return,
+    a player is caught up from WorldEvents dated after their last_seen_at,
+    rather than the scene having been frozen waiting for them.
+    """
+    __tablename__ = "world_events"
+
+    id = Column(Integer, primary_key=True, index=True)
+    world = Column(String, default="Overworld Nexus", index=True)
+
+    headline = Column(String, nullable=False)    # one-line, for catch-up digests
+    body = Column(Text, nullable=True)
+    faction = Column(String, nullable=True, index=True)
+    importance = Column(Integer, default=2, nullable=False, index=True)
+
+    occurred_at = Column(DateTime, default=datetime.utcnow, index=True)
+    created_by = Column(String, nullable=True)   # daemon / gm / system
