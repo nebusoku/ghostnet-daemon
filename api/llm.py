@@ -138,6 +138,16 @@ def _provider(name: str) -> Provider:
             headers=p.headers,
         )
 
+    if name == "cli":
+        # Generic local-CLI backend. Deliberately command-agnostic: the exact
+        # invocation lives in config, so a CLI updating its flags is an env
+        # change rather than a code change.
+        return Provider(
+            name="cli",
+            kind="cli",
+            model=settings.cli_command or "(unset)",
+        )
+
     if name == "ollama":
         return Provider(
             name="ollama",
@@ -286,7 +296,93 @@ async def generate_with(
 
     if p.kind == "ollama":
         return await _generate_ollama(http, p, messages, limit, temp)
+    if p.kind == "cli":
+        return await _generate_cli(p, messages, limit)
     return await _generate_openai_compatible(http, p, messages, limit, temp)
+
+
+# ---------------------------------------------------------------------------
+# Local CLI
+# ---------------------------------------------------------------------------
+# Drives a locally-authenticated command-line tool as a generation backend.
+# The point is auth: a CLI logged in against a subscription handles its own
+# credentials, so no API key exists to configure.
+#
+# Known trade-offs, accepted deliberately:
+#   * SERIALISED. CLI tools are not concurrency-safe and may share session
+#     state, so a lock allows one generation at a time. Fine for a handful of
+#     players; a bottleneck beyond that.
+#   * Process-spawn latency on every message.
+#   * Fragile. Output format and flags change between CLI versions, and a
+#     silent format change looks like a quality regression, not an error.
+#   * Driving a subscription CLI as a server backend is outside its intended
+#     single-user interactive use.
+
+_CLI_LOCK = asyncio.Lock()
+
+# CLIs emit colour codes and spinner control sequences even when piped.
+_ANSI = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07]*\x07")
+
+
+def _flatten(messages: List[dict]) -> str:
+    """Render a chat message list as one prompt for a CLI that takes text."""
+    system = [m["content"] for m in messages if m.get("role") == "system"]
+    convo = [m for m in messages if m.get("role") in ("user", "assistant")]
+
+    parts: List[str] = []
+    if system:
+        parts.append("\n\n".join(system))
+        parts.append("---")
+    for m in convo:
+        who = "Player" if m["role"] == "user" else "You"
+        parts.append(f"{who}: {m['content']}")
+    parts.append("You:")
+    return "\n\n".join(parts)
+
+
+async def _generate_cli(p: Provider, messages: List[dict], max_tokens: int) -> str:
+    if not settings.cli_command:
+        raise ProviderUnavailable("cli: CLI_COMMAND not set")
+
+    argv = [settings.cli_command] + shlex.split(settings.cli_args or "")
+    prompt = _flatten(messages)
+
+    async with _CLI_LOCK:
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                *argv,
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                cwd=settings.cli_cwd or None,
+            )
+        except FileNotFoundError:
+            raise ProviderUnavailable(f"cli: {settings.cli_command!r} not found on PATH")
+        except OSError as e:
+            raise ProviderUnavailable(f"cli: could not start {argv[0]!r}: {e}")
+
+        try:
+            out, err = await asyncio.wait_for(
+                proc.communicate(prompt.encode("utf-8")),
+                timeout=settings.cli_timeout,
+            )
+        except asyncio.TimeoutError:
+            proc.kill()
+            await proc.wait()
+            raise ProviderUnavailable(
+                f"cli: {settings.cli_command} exceeded {settings.cli_timeout}s"
+            )
+
+    if proc.returncode != 0:
+        detail = (err or b"").decode("utf-8", "replace").strip()[:300]
+        raise ProviderUnavailable(
+            f"cli: exit {proc.returncode}: {detail or '(no stderr)'}"
+        )
+
+    text = _ANSI.sub("", (out or b"").decode("utf-8", "replace")).strip()
+    if not text:
+        raise ProviderUnavailable("cli: produced no output on stdout")
+    return text
 
 
 # ---------------------------------------------------------------------------

@@ -77,6 +77,20 @@ class Settings(BaseModel):
     openrouter_referer: str = os.getenv("OPENROUTER_REFERER", "")
     openrouter_title: str = os.getenv("OPENROUTER_TITLE", "")
 
+    # --- Local CLI backend ---------------------------------------------------
+    # Drives a locally-authenticated CLI (e.g. a subscription-logged-in tool)
+    # as a generation provider. Command-agnostic on purpose: a CLI changing
+    # its flags should be an env edit, not a code change.
+    #
+    # The prompt is written to the command's STDIN and the reply is read from
+    # STDOUT, so the CLI must support a non-interactive mode that does that.
+    # Generation is serialised (one at a time) -- CLI tools are rarely
+    # concurrency-safe.
+    cli_command: str = os.getenv("CLI_COMMAND", "")
+    cli_args: str = os.getenv("CLI_ARGS", "")
+    cli_cwd: str = os.getenv("CLI_CWD", "")
+    cli_timeout: int = int(os.getenv("CLI_TIMEOUT", 120))
+
     # --- Memory --------------------------------------------------------------
     # Prompt cost must stay flat as conversations grow. See api/memory.py.
     memory_enabled: bool = os.getenv("MEMORY_ENABLED", "true").strip().lower() in (

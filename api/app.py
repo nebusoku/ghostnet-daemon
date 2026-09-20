@@ -473,7 +473,9 @@ guidance, step outside the fiction and answer plainly.
         verdict = screen_output(content, system_texts=instruction_texts)
         if verdict.leaked:
             print(
-                f"[guard] output leak {verdict.categories} -- regenerating",
+                f"[guard] output leak {verdict.categories} -- regenerating"
+                + (f" | echoed: {verdict.echoed}" if verdict.echoed else "")
+                + f" | draft: {content[:160]!r}",
                 flush=True,
             )
             try:

@@ -336,6 +336,10 @@ class OutputVerdict:
     leaked: bool
     categories: list = field(default_factory=list)
     fallback: Optional[str] = None
+    # Verbatim spans that triggered prompt_echo. Without these, a flagged
+    # draft is discarded and there is no way to tell a genuine recitation
+    # from a false positive -- which cost real debugging time on 2026-09-20.
+    echoed: list = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -391,6 +395,18 @@ def _shingles(text: str, n: int = _ECHO_SHINGLE) -> set:
     return {tuple(words[i:i + n]) for i in range(len(words) - n + 1)}
 
 
+def echo_spans(output: str, system_texts, n: int = _ECHO_SHINGLE) -> list:
+    """Verbatim n-word spans shared between output and the instruction text."""
+    out = _shingles(output, n)
+    if not out:
+        return []
+    hits = []
+    for sys_text in system_texts or ():
+        for sh in out & _shingles(sys_text, n):
+            hits.append(" ".join(sh))
+    return hits
+
+
 def detect_prompt_echo(output: str, system_texts, n: int = _ECHO_SHINGLE) -> bool:
     """
     True if `output` contains a long verbatim span from the prompt.
@@ -437,11 +453,17 @@ def screen_output(
 
     hits = [name for name, pattern in _LEAK_PATTERNS if pattern.search(text)]
 
-    if system_texts and detect_prompt_echo(text, system_texts):
+    spans = echo_spans(text, system_texts) if system_texts else []
+    if spans:
         hits.append("prompt_echo")
 
     if not hits:
         return OutputVerdict(leaked=False)
 
     picker = rng or random
-    return OutputVerdict(leaked=True, categories=hits, fallback=picker.choice(_FALLBACK))
+    return OutputVerdict(
+        leaked=True,
+        categories=hits,
+        fallback=picker.choice(_FALLBACK),
+        echoed=spans[:3],
+    )
