@@ -127,9 +127,9 @@ async def health_deep(_: None = Depends(api_key_auth)):
 # ---------------------------------------------------------
 # Chat (LLM) endpoint
 # ---------------------------------------------------------
-# RAG tuning
-RAG_SCORE_THRESHOLD = 0.55
-MAX_RAG_DOCS = 5
+# RAG tuning now lives in settings so it can be retuned without a deploy.
+RAG_SCORE_THRESHOLD = settings.rag_score_threshold
+MAX_RAG_DOCS = settings.rag_max_docs
 
 
 def _env_truthy(v: str) -> bool:
@@ -372,7 +372,7 @@ guidance, step outside the fiction and answer plainly.
         # declarative, and shaped like a terminal readout means there is less
         # to leak -- and that a leak still reads as in-world.
         if strong:
-            ctx = trim("\n\n".join(strong), 1200)
+            ctx = trim("\n\n".join(strong), settings.rag_context_chars)
             msgs.insert(
                 0,
                 {

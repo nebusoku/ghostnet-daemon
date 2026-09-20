@@ -99,7 +99,22 @@ class Settings(BaseModel):
 
     # RAG tuning
     max_input_tokens: int = int(os.getenv("MAX_INPUT_TOKENS", 6000))
-    top_k: int = int(os.getenv("RETRIEVAL_TOP_K", 2))
+
+    # Retrieval depth. Was 2, which injected two documents out of a twelve
+    # document corpus -- asked about factions the model saw two of the three
+    # and invented five more. 6 fits comfortably now that num_ctx is 8192.
+    top_k: int = int(os.getenv("RETRIEVAL_TOP_K", 6))
+
+    # Score floor for a hit to count as canon. Calibrated against
+    # nomic-embed-text WITH task prefixes, where real canon scores 0.55-0.70
+    # and unrelated text sits near 0.45. Retune if the embedding model changes.
+    rag_score_threshold: float = float(os.getenv("RAG_SCORE_THRESHOLD", 0.55))
+    rag_max_docs: int = int(os.getenv("RAG_MAX_DOCS", 6))
+
+    # Character budget for retrieved context. Was hardcoded at 1200 (~300
+    # tokens) when num_ctx was 2048; at 8192 that cap threw away most of what
+    # retrieval found.
+    rag_context_chars: int = int(os.getenv("RAG_CONTEXT_CHARS", 4000))
     chunk_size: int = int(os.getenv("CHUNK_SIZE", 1000))
     chunk_overlap: int = int(os.getenv("CHUNK_OVERLAP", 150))
 
