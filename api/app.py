@@ -1,4 +1,5 @@
 import json
+import re
 from typing import List, Optional
 
 import httpx
@@ -174,6 +175,42 @@ def aliases_from_db(raw) -> List[str]:
 
 def trim(s: str, n: int) -> str:
     return s if len(s) <= n else s[:n] + "…"
+
+
+# Terminal punctuation, including closing quotes/brackets after a stop.
+_SENTENCE_END = re.compile(r'[.!?][)"\'’”\]]*(?:\s|$)')
+
+
+def trim_to_sentence(text: str, *, min_keep: float = 0.35) -> str:
+    """
+    Cut a length-truncated reply back to its last complete sentence.
+
+    Hitting the token cap mid-word is visible and cheap-looking. The live
+    transcript is full of it: "It's worth noting that Eris is not necessarily
+    an", "Other than that, life", "It's a fluid layer, ever". A slightly
+    shorter reply that lands on a full stop reads as deliberate.
+
+    Only applies when the text does not already end cleanly AND a sentence
+    boundary exists in the last `min_keep` of it -- so a genuinely short
+    reply, or one ending on an em dash for effect, is left alone.
+    """
+    if not text:
+        return text
+
+    stripped = text.rstrip()
+    if not stripped or _SENTENCE_END.search(stripped[-3:] + " "):
+        return stripped
+
+    ends = [m.end() for m in _SENTENCE_END.finditer(stripped)]
+    if not ends:
+        return stripped
+
+    cut = ends[-1]
+    if cut < len(stripped) * min_keep:
+        # Trimming would discard most of the reply; the fragment is worth
+        # more than a stub.
+        return stripped
+    return stripped[:cut].rstrip()
 
 
 @app.post("/chat", response_model=ChatResponse)
@@ -404,6 +441,9 @@ guidance, step outside the fiction and answer plainly.
             else:
                 print("[guard] retry still leaking -- using fallback", flush=True)
                 content = verdict.fallback or content
+
+    # A reply cut off at the token cap reads as a bug. Land it on a sentence.
+    content = trim_to_sentence(content)
 
     # --- Persist the exchange --------------------------------------------
     if convo is not None:

@@ -327,3 +327,44 @@ class TestPromptEchoRegression(unittest.TestCase):
             system_texts=[self.SYSTEM_MSG], rng=_rng(),
         )
         self.assertFalse(v.leaked, f"false positive: {v.categories}")
+
+
+class TestSentenceTrim(unittest.TestCase):
+    """
+    Truncation cleanup. Fragments below are verbatim from the live
+    #testing-general transcript, where num_predict=256 cut replies mid-word.
+    """
+
+    def setUp(self):
+        from api.app import trim_to_sentence
+        self.trim = trim_to_sentence
+
+    def test_trims_real_truncations(self):
+        cases = [
+            ("We've got our own code, our own way of playing the game. "
+             "And I'm not sure you'd be comfortable with that kind of",
+             "We've got our own code, our own way of playing the game."),
+            ("She's been known to wreak havoc on the world. "
+             "It's worth noting that Eris is not necessarily an",
+             "She's been known to wreak havoc on the world."),
+        ]
+        for raw, want in cases:
+            with self.subTest(raw=raw[:40]):
+                self.assertEqual(self.trim(raw), want)
+
+    def test_leaves_complete_replies_alone(self):
+        for text in [
+            "The Spire does not answer questions. It files them.",
+            'He said "get out." Then the lights went.',
+            "Is that what you think? Ask again.",
+        ]:
+            with self.subTest(text=text):
+                self.assertEqual(self.trim(text), text)
+
+    def test_keeps_fragment_when_trimming_would_gut_it(self):
+        # Boundary too early: a stub is worse than the fragment.
+        raw = "Yes. " + "the signal kept climbing and nobody moved to stop it"
+        self.assertEqual(self.trim(raw), raw.rstrip())
+
+    def test_handles_empty(self):
+        self.assertEqual(self.trim(""), "")
