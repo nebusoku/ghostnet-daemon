@@ -1,0 +1,90 @@
+#!/bin/bash
+# Run the Codex CLI as an isolated, unprivileged user.
+#
+# WHY THIS EXISTS
+# ---------------
+# `codex exec` is a coding AGENT with shell access, not a plain inference
+# endpoint. Wiring it as the chat backend means untrusted Discord messages
+# become agent prompts. Run as `jfitzgerald` with the repo as its working
+# directory, a player could ask it to read .env -- which holds DISCORD_TOKEN,
+# DATABASE_URL, API_KEY and BACKEND_API_KEY.
+#
+# `--sandbox read-only` does NOT prevent that: read-only still reads.
+#
+# So the agent runs as a SEPARATE UID that simply cannot open those files.
+# That is enforced by the kernel rather than by prompt wording or by the
+# regex guard in api/guard.py, which is best-effort by nature.
+#
+# INSTALL (as root)
+# -----------------
+#   install -m 0755 deploy/ghostnet-codex /usr/local/bin/ghostnet-codex
+#
+#   adduser --system --group --home /home/codexjail --shell /bin/bash codexjail
+#   chmod 700 /home/codexjail
+#   mkdir -p /home/codexjail/work && git init -q /home/codexjail/work
+#   chown -R codexjail:codexjail /home/codexjail
+#
+#   # keep jfitzgerald's secrets unreadable to other users
+#   chmod 640 /home/jfitzgerald/ghostnet-daemon/.env
+#   chmod 750 /home/jfitzgerald
+#
+#   # log in ONCE as the jail user (device auth on a headless box)
+#   sudo -u codexjail -H bash -lc 'codex login --device-auth'
+#
+#   # allow only this wrapper, only as codexjail, without a password
+#   cat >/etc/sudoers.d/ghostnet-codex <<'SUDO'
+#   jfitzgerald ALL=(codexjail) NOPASSWD: /usr/local/bin/ghostnet-codex-inner
+#   SUDO
+#   chmod 440 /etc/sudoers.d/ghostnet-codex
+#   visudo -c
+#
+# Then point the API at it:
+#   CLI_COMMAND=/usr/local/bin/ghostnet-codex
+#   CLI_ARGS=
+#   CLI_MODELS=gpt-5.7-luna,gpt-5.6-luna
+#   CLI_MODEL_FLAG=-m
+#   CLI_OUTPUT_FILE_FLAG=-o
+#
+# REMAINING RISK
+# --------------
+# A separate UID stops the agent reading this project's secrets. It does NOT
+# stop it reading world-readable system files or reaching the network. For
+# stronger isolation, run it in a container or under a systemd unit with
+# PrivateTmp/ProtectHome/ProtectSystem=strict and no network.
+
+set -euo pipefail
+
+JAIL_USER="${GHOSTNET_CODEX_USER:-codexjail}"
+JAIL_WORK="${GHOSTNET_CODEX_WORK:-/home/codexjail/work}"
+
+# Fixed, non-negotiable safety flags. Anything the caller passes is appended
+# AFTER these, so a caller cannot weaken them by omission -- and the sudoers
+# rule pins this wrapper, so the flags cannot be dropped by editing env alone.
+FIXED=(
+  exec
+  --sandbox read-only          # no writes; the separate UID handles reads
+  --cd "$JAIL_WORK"            # nothing sensitive in the working directory
+  --skip-git-repo-check
+  --color never                # no ANSI in captured output
+)
+
+# Refuse the escape hatches outright, whatever is configured upstream.
+for arg in "$@"; do
+  case "$arg" in
+    --dangerously-bypass-approvals-and-sandbox|--dangerously-bypass-hook-trust)
+      echo "ghostnet-codex: refusing $arg" >&2
+      exit 64
+      ;;
+    --sandbox)
+      echo "ghostnet-codex: sandbox mode is fixed by this wrapper" >&2
+      exit 64
+      ;;
+  esac
+done
+
+if [ "$(id -un)" = "$JAIL_USER" ]; then
+  # Already the jail user (invoked via the inner path by sudo).
+  exec codex "${FIXED[@]}" "$@"
+fi
+
+exec sudo -n -u "$JAIL_USER" /usr/local/bin/ghostnet-codex-inner "$@"

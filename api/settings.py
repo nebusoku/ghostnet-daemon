@@ -88,8 +88,31 @@ class Settings(BaseModel):
     # concurrency-safe.
     cli_command: str = os.getenv("CLI_COMMAND", "")
     cli_args: str = os.getenv("CLI_ARGS", "")
+
+    # Ordered model candidates for the CLI, newest first, e.g.
+    #   CLI_MODELS=gpt-5.9-luna,gpt-5.8-luna,gpt-5.7-luna,gpt-5.6-luna
+    #
+    # Vendors roll versions (5.4 -> 5.5 -> 5.6 -> 5.7) and a single pinned id
+    # becomes a dead link the day the next one ships. Listing UNRELEASED
+    # versions ahead of the current one is deliberate: they fail fast and cost
+    # nothing while they do not exist, then start serving automatically on the
+    # day they do. Self-adapting with no maintenance.
+    #
+    # Each entry becomes its own chain link, so a model that does not exist
+    # falls through to the next exactly like a rate-limited provider does.
+    cli_models: str = os.getenv("CLI_MODELS", "")
+    # Flag this CLI uses to select a model. Configurable because it differs
+    # between tools and between versions of the same tool.
+    cli_model_flag: str = os.getenv("CLI_MODEL_FLAG", "--model")
     cli_cwd: str = os.getenv("CLI_CWD", "")
     cli_timeout: int = int(os.getenv("CLI_TIMEOUT", 120))
+
+    # Flag that makes the CLI write ONLY its final message to a file, e.g.
+    # codex's "-o" / "--output-last-message". Agent CLIs interleave banners,
+    # session ids, sandbox warnings and token counts with the reply on stdout;
+    # a dedicated output file avoids parsing prose out of scaffolding. Leave
+    # empty to read stdout instead.
+    cli_output_file_flag: str = os.getenv("CLI_OUTPUT_FILE_FLAG", "")
 
     # --- Memory --------------------------------------------------------------
     # Prompt cost must stay flat as conversations grow. See api/memory.py.

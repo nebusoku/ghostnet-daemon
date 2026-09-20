@@ -40,8 +40,11 @@ it is the slowest and weakest and should never be reached first.
 from __future__ import annotations
 
 import asyncio
+import fnmatch
+import os
 import re
 import shlex
+import tempfile
 from dataclasses import dataclass, field
 from typing import List, Optional
 
@@ -119,6 +122,80 @@ def _openrouter_models() -> List[str]:
     return [settings.openrouter_model] if settings.openrouter_model else []
 
 
+# ---------------------------------------------------------------------------
+# Version-tracking model patterns
+# ---------------------------------------------------------------------------
+# A model id containing "*" is treated as a pattern and resolved to the
+# NEWEST matching model in the provider's catalogue.
+#
+# Why: vendors roll versions (gpt-5.4 -> 5.5 -> 5.6 -> 5.7). A pinned id
+# becomes a dead link the day the next version ships, and the chain would
+# silently degrade to a weaker fallback. "openai/gpt-*-luna" keeps tracking
+# the Luna line without following a vendor's own "latest" alias, so the
+# family stays fixed while the version floats.
+#
+# Sorting is NUMERIC per component, not lexicographic: "5.10" must beat
+# "5.6", which string comparison gets backwards.
+
+_CATALOGUE: dict = {"expires": 0.0, "ids": []}
+_PATTERN_CACHE: dict = {}
+_CATALOGUE_TTL = 3600.0
+_PATTERN_TTL = 3600.0
+
+
+def _version_key(model_id: str) -> tuple:
+    """Sort key from the numbers in an id: gpt-5.6-luna -> (5, 6)."""
+    return tuple(int(n) for n in re.findall(r"\d+", model_id)) or (0,)
+
+
+async def _openrouter_catalogue(http: httpx.AsyncClient) -> List[str]:
+    """Model ids from OpenRouter, cached for an hour."""
+    now = asyncio.get_event_loop().time()
+    if _CATALOGUE["ids"] and now < _CATALOGUE["expires"]:
+        return _CATALOGUE["ids"]
+
+    r = await http.get(
+        f"{settings.openrouter_base_url.rstrip('/')}/models", timeout=20
+    )
+    r.raise_for_status()
+    ids = [m["id"] for m in (r.json().get("data") or []) if m.get("id")]
+    _CATALOGUE["ids"] = ids
+    _CATALOGUE["expires"] = now + _CATALOGUE_TTL
+    return ids
+
+
+async def resolve_model_pattern(http: httpx.AsyncClient, spec: str) -> str:
+    """
+    Resolve "openai/gpt-*-luna" to the newest matching model id.
+
+    Plain ids pass through untouched. An unresolvable pattern raises
+    ProviderUnavailable so the chain moves on rather than sending a
+    literal "*" to the provider.
+    """
+    if "*" not in spec:
+        return spec
+
+    now = asyncio.get_event_loop().time()
+    cached = _PATTERN_CACHE.get(spec)
+    if cached and now < cached[0]:
+        return cached[1]
+
+    try:
+        ids = await _openrouter_catalogue(http)
+    except Exception as e:
+        raise ProviderUnavailable(f"could not fetch model catalogue: {e}")
+
+    matches = [i for i in ids if fnmatch.fnmatch(i, spec)]
+    if not matches:
+        raise ProviderUnavailable(f"no model matches pattern {spec!r}")
+
+    best = max(matches, key=_version_key)
+    _PATTERN_CACHE[spec] = (now + _PATTERN_TTL, best)
+    print(f"[llm] pattern {spec!r} -> {best!r} "
+          f"({len(matches)} candidate(s))", flush=True)
+    return best
+
+
 def _provider(name: str) -> Provider:
     name = (name or "").strip().lower()
 
@@ -138,14 +215,35 @@ def _provider(name: str) -> Provider:
             headers=p.headers,
         )
 
+    # "cli#<model>" pins one model on the CLI. resolve_chain() expands a bare
+    # "cli" into one of these per CLI_MODELS entry, so a version that does not
+    # exist yet fails fast and falls through -- which is what lets a list of
+    # future versions self-activate as they ship.
+    if name.startswith("cli#"):
+        model = name.split("#", 1)[1]
+        base = _provider("cli")
+        extra = f"{settings.cli_model_flag} {model}".strip()
+        invocation = " ".join(
+            filter(None, [settings.cli_command, settings.cli_args, extra])
+        ).strip()
+        return Provider(name=f"cli[{model}]", kind="cli", model=invocation)
+
     if name == "cli":
         # Generic local-CLI backend. Deliberately command-agnostic: the exact
         # invocation lives in config, so a CLI updating its flags is an env
         # change rather than a code change.
+        #
+        # `model` carries the FULL invocation, not just the binary, because
+        # CLIs usually select the model with a flag (e.g. "exec --model X").
+        # Showing only the command in /health/deep would hide which model is
+        # actually serving -- the question that has been hardest to answer.
+        invocation = " ".join(
+            filter(None, [settings.cli_command, settings.cli_args])
+        ).strip()
         return Provider(
             name="cli",
             kind="cli",
-            model=settings.cli_command or "(unset)",
+            model=invocation or "(unset)",
         )
 
     if name == "ollama":
@@ -204,7 +302,13 @@ def resolve_chain() -> List[str]:
         p = part.strip().lower()
         if not p:
             continue
-        if p == "openrouter":
+        if p == "cli":
+            models = [m.strip() for m in (settings.cli_models or "").split(",") if m.strip()]
+            if models:
+                names.extend(f"cli#{m}" for m in models)
+            else:
+                names.append(p)
+        elif p == "openrouter":
             models = _openrouter_models()
             names.extend(f"openrouter#{m}" for m in models) if models else names.append(p)
         else:
@@ -343,46 +447,92 @@ def _flatten(messages: List[dict]) -> str:
 async def _generate_cli(p: Provider, messages: List[dict], max_tokens: int) -> str:
     if not settings.cli_command:
         raise ProviderUnavailable("cli: CLI_COMMAND not set")
+    if not p.model or p.model == "(unset)":
+        raise ProviderUnavailable("cli: no invocation configured")
 
-    argv = [settings.cli_command] + shlex.split(settings.cli_args or "")
+    # p.model holds the full invocation, including the per-model flag when
+    # the chain expanded "cli" into "cli#<model>".
+    argv = shlex.split(p.model)
     prompt = _flatten(messages)
 
-    async with _CLI_LOCK:
-        try:
-            proc = await asyncio.create_subprocess_exec(
-                *argv,
-                stdin=asyncio.subprocess.PIPE,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                cwd=settings.cli_cwd or None,
-            )
-        except FileNotFoundError:
-            raise ProviderUnavailable(f"cli: {settings.cli_command!r} not found on PATH")
-        except OSError as e:
-            raise ProviderUnavailable(f"cli: could not start {argv[0]!r}: {e}")
+    # Agent CLIs print banners, session ids, warnings and token counts to
+    # stdout alongside the reply. When the tool can write JUST the final
+    # message to a file (codex: "-o/--output-last-message"), use that instead
+    # of parsing prose out of scaffolding.
+    out_path = None
+    if settings.cli_output_file_flag:
+        fd, out_path = tempfile.mkstemp(prefix="ghostnet-cli-", suffix=".txt")
+        os.close(fd)
+        # mkstemp creates 0600 owned by THIS process's user. When the CLI runs
+        # under a different UID -- which is the point of the jail wrapper in
+        # deploy/ghostnet-codex -- it cannot write here, and the command
+        # succeeds while producing nothing. Observed 2026-09-20: exit 0, empty
+        # file, no error anywhere. Widen the mode so a jailed CLI can write,
+        # and treat an empty file as a hard failure rather than an empty reply.
+        os.chmod(out_path, 0o666)
+        argv += shlex.split(settings.cli_output_file_flag) + [out_path]
 
-        try:
-            out, err = await asyncio.wait_for(
-                proc.communicate(prompt.encode("utf-8")),
-                timeout=settings.cli_timeout,
-            )
-        except asyncio.TimeoutError:
-            proc.kill()
-            await proc.wait()
+    try:
+        async with _CLI_LOCK:
+            try:
+                proc = await asyncio.create_subprocess_exec(
+                    *argv,
+                    stdin=asyncio.subprocess.PIPE,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                    cwd=settings.cli_cwd or None,
+                )
+            except FileNotFoundError:
+                raise ProviderUnavailable(f"cli: {argv[0]!r} not found on PATH")
+            except OSError as e:
+                raise ProviderUnavailable(f"cli: could not start {argv[0]!r}: {e}")
+
+            try:
+                out, err = await asyncio.wait_for(
+                    proc.communicate(prompt.encode("utf-8")),
+                    timeout=settings.cli_timeout,
+                )
+            except asyncio.TimeoutError:
+                proc.kill()
+                await proc.wait()
+                raise ProviderUnavailable(
+                    f"cli: {settings.cli_command} exceeded {settings.cli_timeout}s"
+                )
+
+        if proc.returncode != 0:
+            detail = (err or b"").decode("utf-8", "replace").strip()[:300]
             raise ProviderUnavailable(
-                f"cli: {settings.cli_command} exceeded {settings.cli_timeout}s"
+                f"cli: exit {proc.returncode}: {detail or '(no stderr)'}"
             )
 
-    if proc.returncode != 0:
-        detail = (err or b"").decode("utf-8", "replace").strip()[:300]
-        raise ProviderUnavailable(
-            f"cli: exit {proc.returncode}: {detail or '(no stderr)'}"
-        )
+        if out_path:
+            try:
+                with open(out_path, "r", encoding="utf-8", errors="replace") as fh:
+                    raw = fh.read()
+            except OSError as e:
+                raise ProviderUnavailable(f"cli: could not read output file: {e}")
+            if not raw.strip():
+                # Almost always a cross-UID permission problem rather than a
+                # model that said nothing. Say so, instead of surfacing it as
+                # an empty reply.
+                raise ProviderUnavailable(
+                    f"cli: exited 0 but wrote nothing to {out_path} -- if the "
+                    "CLI runs under a different user, it may be unable to "
+                    "write there. Clear CLI_OUTPUT_FILE_FLAG to read stdout."
+                )
+        else:
+            raw = (out or b"").decode("utf-8", "replace")
 
-    text = _ANSI.sub("", (out or b"").decode("utf-8", "replace")).strip()
-    if not text:
-        raise ProviderUnavailable("cli: produced no output on stdout")
-    return text
+        text = _ANSI.sub("", raw).strip()
+        if not text:
+            raise ProviderUnavailable("cli: produced no output")
+        return text
+    finally:
+        if out_path:
+            try:
+                os.unlink(out_path)
+            except OSError:
+                pass
 
 
 # ---------------------------------------------------------------------------
