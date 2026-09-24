@@ -34,6 +34,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import os
+from pathlib import Path
 import sys
 from collections import Counter
 
@@ -275,6 +276,82 @@ async def _restore(args, qc: QdrantClient) -> int:
     return 0
 
 
+async def _edit(args, qc: QdrantClient) -> int:
+    """
+    Replace a document's body and rebuild its vector.
+
+    There is no update path: /world/docs is insert-only, with no PATCH and no
+    DELETE. Editing in place therefore means deleting the old point and
+    embedding the new text, because the stale vector would otherwise keep
+    matching the old wording forever -- the row would say one thing and
+    retrieval would answer with another.
+
+    Body comes from a file, not an argument. Canon text is multi-paragraph
+    and full of quotes and em dashes; passing it through a shell is how it
+    gets mangled.
+    """
+    new_body = args.body_file.read_text(encoding="utf-8").strip()
+    if not new_body:
+        sys.exit("refusing to write an empty body")
+
+    counts = point_counts(qc)
+
+    with SessionLocal() as db:
+        targets = resolve(db, args)
+        if len(targets) != 1:
+            sys.exit(f"edit takes exactly one document, matched {len(targets)}")
+
+        d = targets[0]
+        doc_id, old_body = d.id, d.body or ""
+
+        if old_body.strip() == new_body:
+            print("\n  body is unchanged -- nothing to do")
+            return 0
+
+        print(f"\n  editing doc#{doc_id} [{d.status}] {d.title}\n")
+        print(f"  BEFORE ({len(old_body.split())} words, "
+              f"{counts.get(doc_id, 0)} vector(s)):")
+        print(f"    {old_body[:400]}\n")
+        print(f"  AFTER ({len(new_body.split())} words):")
+        print(f"    {new_body[:400]}\n")
+
+        if not args.apply:
+            print("  DRY RUN -- nothing changed. Re-run with --apply.")
+            return 0
+
+        if counts.get(doc_id, 0):
+            qc.delete(
+                collection_name=settings.collection,
+                points_selector=qmodels.FilterSelector(
+                    filter=qmodels.Filter(must=[
+                        qmodels.FieldCondition(
+                            key="doc_id",
+                            match=qmodels.MatchValue(value=doc_id),
+                        )
+                    ])
+                ),
+            )
+
+        d.body = new_body
+        async with httpx.AsyncClient(timeout=120) as http:
+            await upsert_world_documents(http=http, qc=qc, db=db, docs=[d])
+
+    after = point_counts(qc)
+    print(f"  doc#{doc_id} rewritten; {after.get(doc_id, 0)} vector(s)")
+    if after.get(doc_id, 0) != 1:
+        print(f"  WARNING: expected exactly 1 vector, found "
+              f"{after.get(doc_id, 0)}")
+        return 1
+    print("  verified: one vector, matching the new text")
+    return 0
+
+
+def cmd_edit(args) -> int:
+    if args.id is None and not args.title:
+        sys.exit("give --id or --title")
+    return asyncio.run(_edit(args, QdrantClient(url=settings.qdrant_url)))
+
+
 def cmd_restore(args) -> int:
     if args.id is None and not args.title:
         sys.exit("give --id or --title")
@@ -310,6 +387,14 @@ def main() -> int:
                     help="status to write (default: active)")
     sp.add_argument("--apply", action="store_true")
     sp.set_defaults(func=cmd_restore)
+
+    sp = sub.add_parser("edit", help="replace a body and rebuild its vector")
+    sp.add_argument("--id", type=int)
+    sp.add_argument("--title", help="exact title, case-insensitive")
+    sp.add_argument("--body-file", type=Path, required=True,
+                    help="file holding the replacement body")
+    sp.add_argument("--apply", action="store_true")
+    sp.set_defaults(func=cmd_edit)
 
     args = p.parse_args()
     return args.func(args)

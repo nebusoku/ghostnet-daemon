@@ -127,18 +127,20 @@ status: proposed
   doc#16 at 0.725, so the daemon sees both and can hold the two axes at
   once. That is the intended state, not a contention to fix.
 
-  The one real friction is doc#7's opening clause, which denies "fixed
-  linear geography" outright -- a stronger claim than the two-axis reading
-  needs, and the reason it looked like a competing model. Worth softening
-  if you ever rewrite it.
+  doc#7's opening clause used to read "overlapping layers rather than fixed
+  linear geography", denying the physical model outright -- a stronger claim
+  than the two-axis reading needs, and the reason it looked like a
+  competitor. Softened 2026-09-24 to affirm both axes instead. It now leads
+  "is the Nexus a physical place" at 0.733, a question it previously argued
+  against.
 
-  doc#7 in full, since the stubs below expand on one line each:
+  doc#7 as it now stands, since the stubs below expand on one line each:
 
-    "The Nexus is composed of overlapping layers rather than fixed linear
-     geography. The Core handles processing and synchronization. The Mesh
-     is the connective fabric of interactions between nodes. The Operator
-     Interface is where players and entities inject intent, commands, and
-     requests. Layers blend and bleed into one another."
+    "Alongside its physical geography, the Nexus is composed of overlapping
+     system layers. The Core handles processing and synchronization. The
+     Mesh is the connective fabric of interactions between nodes. The
+     Operator Interface is where players and entities inject intent,
+     commands, and requests. Layers blend and bleed into one another."
 
   WHY STUB THEM AT ALL, NOW THAT doc#7 IS BACK: it gives each term a single
   clause. That is enough to retrieve on and not enough to play with. These
