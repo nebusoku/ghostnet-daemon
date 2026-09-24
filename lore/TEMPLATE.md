@@ -63,9 +63,19 @@
       sitting right there.
 
     - SET B MIXES THREE SCALES. Street Level, The Undercircuit and City
-      Signal are the *layers* from doc#7, not districts. Neon Lounge and
-      Market Loop are venues. Only Central Spire and Reflection District
-      are districts proper.
+      Signal are *layers* -- the surface / buried / signal-layer model of
+      doc#16, which the stub bodies cite as "the world briefing". Neon
+      Lounge and Market Loop are venues. Dreamlink is a mesh space. Only
+      Central Spire and Reflection District are districts proper.
+
+  And there is a SECOND, separate collision at the layer level:
+
+      doc#7  (discord-import, Jan)  Core / Mesh / Operator Interface
+      doc#16 (authored, Sept)       surface / buried / signal-layer
+
+  Both are active. They are not the same model and neither references the
+  other. Same pattern as the districts: an imported January doc and an
+  authored September doc describing the same thing differently.
 
   Whichever way you rule, doc#8 has to be rewritten or retired -- while it
   stays active, it contradicts you on every retrieval.
