@@ -88,12 +88,28 @@ def cmd_list(args) -> int:
               f"{(d.created_by or '?')[:16]:<16} {str(d.title)[:40]}{mark}")
         titles.setdefault((d.title or "").strip().lower(), []).append(d.id)
 
+    # A shared title only matters if more than one copy still has a vector.
+    # Once the loser is retired the row remains, deliberately -- reporting
+    # that as a live duplicate would say the problem persists when it does not.
     dupes = {t: ids for t, ids in titles.items() if len(ids) > 1}
-    if dupes:
-        print(f"\n  {len(dupes)} DUPLICATE TITLE(S) -- both retrieve, and "
-              f"whichever scores higher wins the turn:")
-        for t, ids in dupes.items():
+    contested = {t: ids for t, ids in dupes.items()
+                 if sum(1 for i in ids if counts.get(i, 0)) > 1}
+    settled = {t: ids for t, ids in dupes.items() if t not in contested}
+
+    if contested:
+        print(f"\n  {len(contested)} CONTESTED TITLE(S) -- more than one copy "
+              f"retrieves, and whichever scores higher wins the turn:")
+        for t, ids in contested.items():
             print(f"    {ids}  {t}")
+        print("    retire the losers: retire_doc.py retire --title <t> "
+              "--keep <id> --apply")
+
+    if settled:
+        print(f"\n  {len(settled)} shared title(s), already resolved "
+              f"(one vector each, rows kept as history):")
+        for t, ids in settled.items():
+            held = [i for i in ids if counts.get(i, 0)]
+            print(f"    {ids} -> retrieves as {held}  {t}")
 
     orphaned = [d.id for d in docs if counts.get(d.id, 0) == 0
                 and (d.status or "").lower() not in RETIRED_STATUS]
@@ -153,6 +169,11 @@ def cmd_retire(args) -> int:
             print("  DRY RUN -- nothing changed. Re-run with --apply.")
             return 0
 
+        # Capture ids while the session is still open. Reading d.id after the
+        # `with` block exits raises DetachedInstanceError -- commit expires the
+        # instances, and the refresh needs a session that no longer exists.
+        target_ids = [d.id for d in targets]
+
         deleted = 0
         for d in targets:
             if counts.get(d.id, 0):
@@ -173,11 +194,11 @@ def cmd_retire(args) -> int:
         db.commit()
 
     after = point_counts(qc)
-    still = [d for d in targets if after.get(d.id, 0)]
+    still = [i for i in target_ids if after.get(i, 0)]
     print(f"  deleted {deleted} point(s); "
-          f"{len(targets)} row(s) marked {args.status}")
+          f"{len(target_ids)} row(s) marked {args.status}")
     if still:
-        print(f"  WARNING: still vectored: {[d.id for d in still]}")
+        print(f"  WARNING: still vectored: {still}")
         return 1
     print("  verified: no vectors remain for the retired document(s)")
     return 0
