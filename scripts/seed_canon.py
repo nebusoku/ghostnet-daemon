@@ -20,21 +20,37 @@ Tiers, in descending authority:
                                              reachable with --only proposed,
                                              never by a bare `seed --apply`.
 
-Only `active` documents should be treated as settled canon by retrieval.
 `proposed` entries are staged for you to rule on; several record explicit
 contradictions rather than resolving them silently, because resolving
 someone else's setting by guesswork is how the corpus got poisoned the
 first time.
 
+STATUS IS NOT A SAFETY BOUNDARY. `api/rag.py::search_similar` runs a bare
+qc.search() with no query_filter, so a document seeded as `proposed`
+competes for retrieval exactly like settled canon -- STUB text and all.
+Do not seed anything here as a way of staging it. Staging happens in the
+JSON files, before this script runs.
+
+The one real protection is that this script REFUSES TO TRANSMIT gm-only
+documents (see EXCLUDE_STATUS / EXCLUDE_TAGS). That refusal, not retrieval
+filtering, is what keeps real-world influences out of the daemon's mouth.
+
+To take a live document out of play, delete its vector:
+    python scripts/retire_doc.py retire --id <n> --apply
+
 Seeding goes through the API's /world/docs endpoint rather than writing the
 database directly, so documents land in BOTH stores through the same path
 the application uses.
 
-WARNING about the existing collection: `ghostnet_docs` currently holds 26
-points, of which 12 are bot-authored self-quotes (including "I'm just a
-large language model") and 11 have no matching SQL row. Seeding does not
-remove them. Use --wipe-first to recreate the collection empty, or clean it
-separately, or the poison stays retrievable alongside the new canon.
+/world/docs is INSERT-ONLY -- it never upserts on title. Re-seeding a tier
+that is already seeded doubles every document in it, and both copies then
+retrieve. A pre-flight check refuses to --apply when a title is already
+live; override with --allow-duplicates only if you mean it.
+
+(The collection was wiped and reseeded on 2026-09-20 to clear 12 bot-authored
+self-quotes, including "I'm just a large language model". It is clean as of
+2026-09-24: 27 documents, one vector each, no orphans. Verify any time with
+`python scripts/retire_doc.py list`.)
 """
 
 from __future__ import annotations
@@ -82,6 +98,34 @@ def backend() -> tuple:
     if not key:
         sys.exit("set API_KEY (or BACKEND_API_KEY) -- e.g. source /etc/default/ghostnet-api")
     return url.rstrip("/"), {"Authorization": f"Bearer {key}"}
+
+
+def live_titles(url, headers) -> dict:
+    """
+    Titles already in the world corpus, lowercased -> [doc ids].
+
+    /world/docs is INSERT-ONLY -- it never upserts on title, so re-seeding a
+    tier that is already seeded silently doubles every document in it. Both
+    copies then retrieve, and whichever scores higher on a given query is the
+    one the daemon answers with. Nothing downstream detects this, so the
+    check has to happen here.
+
+    None if the corpus could not be read; the caller treats that as unknown
+    rather than as "no duplicates".
+    """
+    try:
+        r = requests.get(f"{url}/world/docs", headers=headers,
+                         params={"limit": 1000}, timeout=30)
+        r.raise_for_status()
+    except requests.RequestException as e:
+        print(f"\n  WARNING: could not read live documents ({e}).")
+        print("  Seeding without a duplicate check.")
+        return None
+
+    out: dict = {}
+    for d in r.json():
+        out.setdefault((d.get("title") or "").strip().lower(), []).append(d.get("id"))
+    return out
 
 
 def load(only=None) -> list:
@@ -173,6 +217,23 @@ def cmd_seed(args) -> None:
     for d in docs:
         print(f"    [{d['_tier']:<10}] {d.get('status','?'):<9} {d.get('title')}")
 
+    live = live_titles(url, headers)
+    if live:
+        clashes = [(d, live[(d.get("title") or "").strip().lower()])
+                   for d in docs
+                   if (d.get("title") or "").strip().lower() in live]
+        if clashes:
+            print(f"\n  {len(clashes)} TITLE(S) ARE ALREADY LIVE. Seeding "
+                  f"inserts a second copy rather than updating:")
+            for d, ids in clashes:
+                print(f"    doc{ids}  [{d['_tier']}] {d.get('title')}")
+            print("\n  Retire the live copy first:")
+            print(f"    python scripts/retire_doc.py retire --id "
+                  f"{clashes[0][1][0]} --apply")
+            print("  or re-run with --allow-duplicates to seed anyway.")
+            if args.apply and not args.allow_duplicates:
+                sys.exit(1)
+
     if not args.apply:
         print("\n  DRY RUN -- nothing sent. Re-run with --apply to seed.")
         return
@@ -216,6 +277,8 @@ def main() -> int:
     sp.add_argument("--only", choices=SELECTABLE)
     sp.add_argument("--apply", action="store_true", help="actually write")
     sp.add_argument("--batch", type=int, default=5)
+    sp.add_argument("--allow-duplicates", action="store_true",
+                    help="seed even if a title is already live")
     sp.add_argument("--wipe-first", action="store_true",
                     help="print the commands to reset the collection first")
     sp.set_defaults(func=cmd_seed)
