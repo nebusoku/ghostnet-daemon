@@ -1,0 +1,25 @@
+# The log must never be served over HTTP.
+#
+# On 2026-09-24 https://overworldnex.us/admin/ghost_console_log.jsonl returned
+# HTTP 200 and 4.3 KB of visitor IP addresses and user agents to anyone who
+# asked for it. No link pointed at it; the path was simply guessable.
+#
+# log.php now writes outside the web root, so this file is the second lock
+# rather than the only one. Keep both: LiteSpeed honours .htaccess, but a
+# future host or a misplaced copy of the log might not, and a data file that
+# is merely unlinked is still public.
+
+<FilesMatch "\.(jsonl|json|log|db|sqlite3?)$">
+    Require all denied
+</FilesMatch>
+
+# Apache 2.2 fallback, harmless under 2.4 / LiteSpeed.
+<IfModule !mod_authz_core.c>
+    <FilesMatch "\.(jsonl|json|log|db|sqlite3?)$">
+        Order allow,deny
+        Deny from all
+    </FilesMatch>
+</IfModule>
+
+# No directory listings anywhere under /admin.
+Options -Indexes

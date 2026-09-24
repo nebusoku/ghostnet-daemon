@@ -13,3 +13,9 @@ ollama/
 Thumbs.db
 .env
 api/*.bak
+
+# Site: real config and captured logs must never be committed.
+# The sample is tracked; the filled-in copy is not.
+site/**/ghost_config.php
+ghost_config.php
+*.jsonl
