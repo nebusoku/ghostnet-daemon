@@ -111,17 +111,28 @@ status: proposed
 
 <!--
   ===================================================================
-  These three lost their only source. Authoring them restores them.
+  Two axes, not two answers. Ruled 2026-09-24.
   ===================================================================
 
-  Core, Mesh and Operator Interface were defined in exactly one place:
-  doc#7, retired 2026-09-24 because its layer model contradicted doc#16.
-  Retiring it took all three terms out of the world. They now retrieve
-  nothing -- "what is the Operator Interface" returns a shell-augmentation
-  doc at 0.585, which is simply the nearest unrelated thing.
+  Core, Mesh and Operator Interface are defined in exactly one place:
+  doc#7. It was retired on 2026-09-24 as contradicting doc#16, then
+  RESTORED the same day once the two were read as describing different
+  things rather than disagreeing about one thing:
 
-  doc#7 in full, so you are not authoring from memory. The SQL row is the
-  only place this text still exists:
+    doc#16 (authored)  surface / buried / signal-layer   physical strata
+    doc#7  (imported)  Core / Mesh / Operator Interface  system components
+
+  Where your body is, versus how the network is built. Both are active and
+  both retrieve; on "how is the Nexus layered" doc#7 leads at 0.789 with
+  doc#16 at 0.725, so the daemon sees both and can hold the two axes at
+  once. That is the intended state, not a contention to fix.
+
+  The one real friction is doc#7's opening clause, which denies "fixed
+  linear geography" outright -- a stronger claim than the two-axis reading
+  needs, and the reason it looked like a competing model. Worth softening
+  if you ever rewrite it.
+
+  doc#7 in full, since the stubs below expand on one line each:
 
     "The Nexus is composed of overlapping layers rather than fixed linear
      geography. The Core handles processing and synchronization. The Mesh
@@ -129,17 +140,15 @@ status: proposed
      Interface is where players and entities inject intent, commands, and
      requests. Layers blend and bleed into one another."
 
-  THE OPEN QUESTION: did doc#7 and doc#16 actually conflict?
+  WHY STUB THEM AT ALL, NOW THAT doc#7 IS BACK: it gives each term a single
+  clause. That is enough to retrieve on and not enough to play with. These
+  stubs are where they get authored properly. When one is finished, retire
+  doc#7 and let the three entries carry the load:
 
-    doc#16 (authored)  surface / buried / signal-layer   physical strata
-    doc#7  (imported)  Core / Mesh / Operator Interface  system components
+    retire_doc.py retire --id 7 --apply
 
-  Those may be two axes rather than two answers -- where your body is,
-  versus how the network is built. doc#7 staked a stronger claim than that,
-  opening by denying "fixed linear geography" outright, which is what put
-  it in conflict. Nothing stops you ruling that both are true at once, on
-  different axes. That ruling would make doc#7 restorable rather than
-  replaced:  retire_doc.py restore --id 7 --apply
+  Do that only once all three are written -- retiring it early takes the
+  terms out of the world again, which is what happened on 2026-09-24.
 
   ONE AUTHORING WARNING: doc#7 says the Operator Interface is where
   "players" inject intent. Do not carry that word across. doc#2 establishes
