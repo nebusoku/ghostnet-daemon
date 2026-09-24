@@ -32,18 +32,21 @@ for exactly that reason.
 from __future__ import annotations
 
 import argparse
+import asyncio
 import os
 import sys
 from collections import Counter
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import httpx  # noqa: E402
 from qdrant_client import QdrantClient  # noqa: E402
 from qdrant_client import models as qmodels  # noqa: E402
 from sqlalchemy import select  # noqa: E402
 
 from api.db import SessionLocal  # noqa: E402
 from api.models import WorldDocument  # noqa: E402
+from api.rag import upsert_world_documents  # noqa: E402
 from api.settings import settings  # noqa: E402
 
 # Anything in here is treated as "not live". Kept in sync with revector.py,
@@ -127,6 +130,24 @@ def cmd_list(args) -> int:
     return 0
 
 
+def resolve(db, args) -> list:
+    """Documents matching --id / --title, minus anything in --keep."""
+    q = select(WorldDocument)
+    if args.id is not None:
+        q = q.where(WorldDocument.id == args.id)
+    targets = list(db.scalars(q.order_by(WorldDocument.id)))
+
+    if args.title:
+        want = args.title.strip().lower()
+        targets = [d for d in targets
+                   if (d.title or "").strip().lower() == want]
+
+    if getattr(args, "keep", None):
+        targets = [d for d in targets if d.id not in args.keep]
+
+    return targets
+
+
 def cmd_retire(args) -> int:
     if args.id is None and not args.title:
         sys.exit("give --id or --title")
@@ -135,18 +156,7 @@ def cmd_retire(args) -> int:
     counts = point_counts(qc)
 
     with SessionLocal() as db:
-        q = select(WorldDocument)
-        if args.id is not None:
-            q = q.where(WorldDocument.id == args.id)
-        targets = list(db.scalars(q.order_by(WorldDocument.id)))
-
-        if args.title:
-            want = args.title.strip().lower()
-            targets = [d for d in targets
-                       if (d.title or "").strip().lower() == want]
-
-        if args.keep:
-            targets = [d for d in targets if d.id not in args.keep]
+        targets = resolve(db, args)
 
         if not targets:
             sys.exit("no document matched -- nothing to retire")
@@ -204,6 +214,73 @@ def cmd_retire(args) -> int:
     return 0
 
 
+async def _restore(args, qc: QdrantClient) -> int:
+    """
+    Put a retired document back: re-embed it AND return it to active.
+
+    Both halves are required. Re-embedding alone leaves a `superseded` row
+    holding a live vector -- and because retrieval ignores status, that
+    document would answer players while every audit reported it as retired.
+    Restoring status alone does nothing at all.
+
+    Scoped to one document on purpose. `revector.py --include-retired` is the
+    blunt instrument and brings back everything.
+    """
+    counts = point_counts(qc)
+
+    with SessionLocal() as db:
+        targets = resolve(db, args)
+        if not targets:
+            sys.exit("no document matched -- nothing to restore")
+
+        target_ids = [d.id for d in targets]
+
+        print(f"\n  restoring {len(targets)} document(s) "
+              f"-> status={args.status}\n")
+        for d in targets:
+            print(f"    #{d.id:<4} {(d.status or '?'):<12} "
+                  f"{(d.created_by or '?')[:16]:<16} {str(d.title)[:44]}")
+            print(f"           {counts.get(d.id, 0)} vector(s) now; "
+                  f"re-embedding costs ~2.5s")
+            print(f"           {(d.body or '')[:150].strip()}...")
+            print()
+
+        already = [d.id for d in targets if counts.get(d.id, 0)]
+        if already:
+            print(f"  NOTE: {already} already have a vector. Re-embedding "
+                  f"adds a SECOND point rather than replacing it, because "
+                  f"points get a random uuid. Retire first, then restore.")
+            if not args.apply:
+                pass
+            else:
+                sys.exit("refusing to double-embed -- retire it first")
+
+        if not args.apply:
+            print("  DRY RUN -- nothing changed. Re-run with --apply.")
+            return 0
+
+        for d in targets:
+            d.status = args.status
+
+        async with httpx.AsyncClient(timeout=120) as http:
+            await upsert_world_documents(http=http, qc=qc, db=db, docs=targets)
+
+    after = point_counts(qc)
+    missing = [i for i in target_ids if not after.get(i, 0)]
+    print(f"  restored {len(target_ids)} document(s) to {args.status}")
+    if missing:
+        print(f"  WARNING: still unvectored: {missing}")
+        return 1
+    print("  verified: vectors present and status active")
+    return 0
+
+
+def cmd_restore(args) -> int:
+    if args.id is None and not args.title:
+        sys.exit("give --id or --title")
+    return asyncio.run(_restore(args, QdrantClient(url=settings.qdrant_url)))
+
+
 def main() -> int:
     p = argparse.ArgumentParser(
         prog="retire_doc",
@@ -224,6 +301,15 @@ def main() -> int:
                     help="status to write (default: superseded)")
     sp.add_argument("--apply", action="store_true")
     sp.set_defaults(func=cmd_retire)
+
+    sp = sub.add_parser("restore", help="re-embed a retired document and "
+                                        "return it to active")
+    sp.add_argument("--id", type=int)
+    sp.add_argument("--title", help="exact title, case-insensitive")
+    sp.add_argument("--status", default="active",
+                    help="status to write (default: active)")
+    sp.add_argument("--apply", action="store_true")
+    sp.set_defaults(func=cmd_restore)
 
     args = p.parse_args()
     return args.func(args)
