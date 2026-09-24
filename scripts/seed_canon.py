@@ -15,10 +15,13 @@ Tiers, in descending authority:
   canon/lore.json        status=active    -- authored Markdown, via import_lore.
   canon/tone.json                         -- voice and house style.
   canon/locations.json   status=proposed  -- derived from channel structure.
-  canon/emergent.json    status=proposed  -- improvised in play, needs a ruling.
-  canon/proposed.json    status=proposed  -- machine-woven drafts. OPT-IN ONLY:
-                                             reachable with --only proposed,
-                                             never by a bare `seed --apply`.
+
+OPT-IN ONLY -- reachable with an explicit --only, never by a bare
+`seed --apply`, because neither is world-facing text:
+
+  canon/emergent.json    improvised in play, needs a ruling. GM material:
+                         contradictions, timestamps, safety annotations.
+  canon/proposed.json    machine-woven drafts, unreviewed.
 
 `proposed` entries are staged for you to rule on; several record explicit
 contradictions rather than resolving them silently, because resolving
@@ -67,15 +70,24 @@ import requests
 ROOT = Path(__file__).resolve().parent.parent
 CANON_DIR = ROOT / "canon"
 
-TIERS = ["foundation", "lore", "tone", "locations", "emergent"]
+TIERS = ["foundation", "lore", "tone", "locations"]
 
-# Loadable only through an explicit --only. `weave_lore.py` tells you to run
-# `seed --only proposed --apply`, which argparse rejected outright because
-# "proposed" was not a valid choice -- and load() iterates TIERS, so the file
-# would not have been read even if it had been. Kept out of TIERS rather than
-# added to it: woven drafts are unreviewed by definition, and a bare
-# `seed --apply` must never sweep them into the collection.
-OPT_IN_TIERS = ["proposed"]
+# Loadable only through an explicit --only.
+#
+# `proposed` -- `weave_lore.py` tells you to run `seed --only proposed
+# --apply`, which argparse rejected outright because "proposed" was not a
+# valid choice, and load() iterated TIERS so the file would not have been
+# read even if it had been. Woven drafts are unreviewed by definition.
+#
+# `emergent` -- this tier is GM MATERIAL, not canon. Its entries carry
+# titles ending "— CONTRADICTORY, needs a ruling", inline "NOTE:" analysis
+# weighing one account against another, chat timestamps like 13:11, and at
+# least one "SAFETY:" annotation about a character's age against the
+# adults-only rule. Retrieval does not filter on status (see the note below),
+# so seeding these would let the daemon quote "three incompatible accounts"
+# and a safety note at a player as though it were settled world fact.
+# Staging happens in the JSON. Seed a ruling, never the deliberation.
+OPT_IN_TIERS = ["proposed", "emergent"]
 
 SELECTABLE = TIERS + OPT_IN_TIERS
 
