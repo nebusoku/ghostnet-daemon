@@ -57,7 +57,11 @@ OUT = ROOT / "canon" / "proposed.json"
 
 # Multi-word Capitalised phrases and ALLCAPS/hyphen-code terms.
 _TERM = re.compile(
-    r"\b(?:[A-Z][a-z]+(?:[-‑][A-Z][a-z]+)?(?:\s+(?:of\s+|the\s+)?[A-Z][a-z]+)*)\b"
+    # Inter-word separator is a literal space, never \s: gather() joins a
+    # document's title to its body with "\n", and \s+ welded the end of one
+    # onto the start of the other -- producing phantom terms like
+    # "Apex Spire Apex Spire" and "Channel Online The".
+    r"\b(?:[A-Z][a-z]+(?:[-‑][A-Z][a-z]+)?(?:[ ]+(?:of[ ]+|the[ ]+)?[A-Z][a-z]+)*)\b"
     r"|\b[A-Z]{2,}(?:-\d+)?\b"
 )
 
@@ -72,6 +76,9 @@ _STOP = {
     "Return", "Note", "Beyond", "Below", "Above", "Here", "Every", "Never",
     "Always", "Only", "Then", "Than", "And", "But", "For", "Nor", "Yet", "So",
     "In", "On", "At", "By", "To", "Of", "Overworld Nexus", "Overworld",
+    "Where", "Power", "Movement", "Commonly", "Developed", "Influence",
+    "Alliances", "Loyalty", "District", "Canon", "Content", "Records",
+    "Fragmented", "Confirmed", "Mentions", "Operators", "Local", "Travel",
     "Nexus", "GhostNet", "GhostNet Daemon", "OOC", "IRL", "AI",
 }
 
@@ -107,21 +114,82 @@ def defined_titles(db) -> set:
     return out
 
 
+def _is_gap(term: str, defined: set, defined_blob: str) -> bool:
+    """
+    Is this a real undefined entity, or detector noise?
+
+    The first version ranked by frequency and surfaced "Daemon", "Shells",
+    "PROC" and "WHAT" while missing Ono-Sendai and the Undercroft entirely.
+    Two reasons: a >=2 threshold excludes exactly the things mentioned once
+    (which is what makes them gaps), and single words that are fragments of an
+    existing title look like new entities.
+    """
+    low = term.lower()
+
+    if low in defined or re.sub(r"^the\s+", "", low) in defined:
+        return False
+
+    # A fragment of something already documented: "Daemon" inside "GhostNet
+    # Daemon", "Shells" inside "Shells and Shell-Linking".
+    if low in defined_blob:
+        return False
+
+    # ALLCAPS is almost always a heading or a log marker in this corpus
+    # ([PROC], WHAT IT FEELS LIKE, STATUS) rather than a proper noun.
+    if term.isupper() and "-" not in term:
+        return False
+
+    multiword = " " in term
+    hyphenated = re.search(r"[-‑]", term) is not None
+    coded = re.search(r"[A-Za-z][-‑]?\d", term) is not None
+
+    # Distinctive shapes are entity-like: "Ono-Sendai", "Spire District",
+    # "Echo-7". A bare capitalised word is usually a sentence start.
+    if not (multiword or hyphenated or coded):
+        return False
+
+    return True
+
+
 def find_gaps(passages, defined) -> list:
-    """Terms the canon names but never defines, ranked by how often."""
+    """
+    Terms the canon names but never defines.
+
+    Ranked by distinctiveness first, frequency second: something mentioned
+    once in a faction brief is a more useful gap than a common phrase
+    repeated in boilerplate.
+    """
+    defined_blob = " | ".join(sorted(defined))
     counts, where = Counter(), {}
+
     for label, text in passages:
         for m in _TERM.finditer(text or ""):
             t = _norm(m.group(0))
+            # A match can start on a sentence-opening word that is not part
+            # of the name: "Where Apex Spire hears data" -> "Apex Spire".
+            words = t.split(" ")
+            while words and words[0] in _STOP:
+                words.pop(0)
+            t = " ".join(words)
             if len(t) < 4 or t in _STOP:
                 continue
-            low = t.lower()
-            if low in defined or re.sub(r"^the\s+", "", low) in defined:
+            if not _is_gap(t, defined, defined_blob):
                 continue
             counts[t] += 1
             where.setdefault(t, set()).add(label)
-    # Mentioned more than once, in the body of the world rather than in passing.
-    return [(t, n, sorted(where[t])) for t, n in counts.most_common() if n >= 2]
+
+    def rank(item):
+        t, n = item
+        score = n
+        if re.search(r"[A-Za-z][-‑]?\d", t):
+            score += 3          # coded designations: Echo-7, TX-010
+        if re.search(r"[-‑]", t):
+            score += 2          # hyphenated names: Ono-Sendai
+        if " " in t:
+            score += 1          # multi-word: Spire District
+        return (-score, t)
+
+    return [(t, n, sorted(where[t])) for t, n in sorted(counts.items(), key=rank)]
 
 
 def excerpts_for(term: str, passages, limit: int = 6) -> list:
