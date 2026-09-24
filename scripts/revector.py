@@ -42,6 +42,10 @@ from api.models import WorldDocument  # noqa: E402
 from api.rag import upsert_world_documents  # noqa: E402
 from api.settings import settings  # noqa: E402
 
+# Kept in sync with retire_doc.py. A document in one of these states is
+# meant to have no vector; re-embedding it would put it back in play.
+RETIRED_STATUS = {"superseded", "retired", "deprecated", "retconned"}
+
 
 def vectored_doc_ids() -> set:
     """doc_ids currently present in the collection."""
@@ -77,9 +81,25 @@ async def run(args) -> int:
         if args.status:
             orphans = [d for d in orphans if d.status == args.status]
 
+        # A retired document has no vector BY DESIGN -- retire_doc.py deleted
+        # it, because retrieval ignores status and deleting the point is the
+        # only thing that actually takes a document out of play. Without this
+        # guard, the next revector run re-embeds it and silently undoes the
+        # retirement.
+        retired = []
+        if not args.include_retired:
+            retired = [d for d in orphans
+                       if (d.status or "").lower() in RETIRED_STATUS]
+            orphans = [d for d in orphans
+                       if (d.status or "").lower() not in RETIRED_STATUS]
+
         print(f"  world_documents in SQL : {len(docs)}")
         print(f"  doc_ids with vectors   : {len(have)}")
-        print(f"  ORPHANED               : {len(orphans)}\n")
+        print(f"  ORPHANED               : {len(orphans)}")
+        if retired:
+            print(f"  retired (left alone)   : {len(retired)} "
+                  f"-> {[d.id for d in retired]}")
+        print()
 
         if not orphans:
             print("  nothing to do -- every document is indexed")
@@ -118,6 +138,9 @@ def main() -> int:
     p.add_argument("--apply", action="store_true")
     p.add_argument("--batch", type=int, default=5)
     p.add_argument("--status", help="only documents with this status")
+    p.add_argument("--include-retired", action="store_true",
+                   help="also re-embed superseded/retired/deprecated "
+                        "documents, putting them back into retrieval")
     return asyncio.run(run(p.parse_args()))
 
 
