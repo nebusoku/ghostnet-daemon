@@ -9,11 +9,16 @@ Dry run by default. Nothing is written until --apply.
     python scripts/seed_canon.py seed --apply          # write it
     python scripts/seed_canon.py seed --only foundation --apply
 
-Three tiers, in descending authority:
+Tiers, in descending authority:
 
   canon/foundation.json  status=active    -- authored by you (website). Truth.
+  canon/lore.json        status=active    -- authored Markdown, via import_lore.
+  canon/tone.json                         -- voice and house style.
   canon/locations.json   status=proposed  -- derived from channel structure.
   canon/emergent.json    status=proposed  -- improvised in play, needs a ruling.
+  canon/proposed.json    status=proposed  -- machine-woven drafts. OPT-IN ONLY:
+                                             reachable with --only proposed,
+                                             never by a bare `seed --apply`.
 
 Only `active` documents should be treated as settled canon by retrieval.
 `proposed` entries are staged for you to rule on; several record explicit
@@ -46,7 +51,17 @@ import requests
 ROOT = Path(__file__).resolve().parent.parent
 CANON_DIR = ROOT / "canon"
 
-TIERS = ["foundation", "tone", "locations", "emergent"]
+TIERS = ["foundation", "lore", "tone", "locations", "emergent"]
+
+# Loadable only through an explicit --only. `weave_lore.py` tells you to run
+# `seed --only proposed --apply`, which argparse rejected outright because
+# "proposed" was not a valid choice -- and load() iterates TIERS, so the file
+# would not have been read even if it had been. Kept out of TIERS rather than
+# added to it: woven drafts are unreviewed by definition, and a bare
+# `seed --apply` must never sweep them into the collection.
+OPT_IN_TIERS = ["proposed"]
+
+SELECTABLE = TIERS + OPT_IN_TIERS
 
 # Documents that must NEVER reach the retrieval collection. GM reference
 # naming real-world influences is the clear case: if the daemon can retrieve
@@ -71,9 +86,7 @@ def backend() -> tuple:
 
 def load(only=None) -> list:
     docs = []
-    for tier in TIERS:
-        if only and tier != only:
-            continue
+    for tier in ([only] if only else TIERS):
         path = CANON_DIR / f"{tier}.json"
         if not path.is_file():
             print(f"  (missing {path.name}, skipping)")
@@ -196,11 +209,11 @@ def main() -> int:
     sub = p.add_subparsers(dest="cmd", required=True)
 
     sp = sub.add_parser("plan", help="summarise what would be seeded")
-    sp.add_argument("--only", choices=TIERS)
+    sp.add_argument("--only", choices=SELECTABLE)
     sp.set_defaults(func=cmd_plan)
 
     sp = sub.add_parser("seed", help="send canon to the API")
-    sp.add_argument("--only", choices=TIERS)
+    sp.add_argument("--only", choices=SELECTABLE)
     sp.add_argument("--apply", action="store_true", help="actually write")
     sp.add_argument("--batch", type=int, default=5)
     sp.add_argument("--wipe-first", action="store_true",
