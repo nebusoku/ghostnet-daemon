@@ -1,0 +1,82 @@
+[
+  {
+    "world": "Overworld Nexus",
+    "kind": "lore",
+    "title": "Spire District",
+    "status": "proposed",
+    "created_by": "woven:ollama",
+    "tags": [
+      "woven",
+      "proposed",
+      "needs-review"
+    ],
+    "body": "The Spire District, a vertical labyrinth of gleaming steel and neon lights, is the epicenter of power and wealth within the Overworld Nexus. Towering corporate structures dominate the skyline, their glass facades reflecting the city's pulsating energy. Here, the elite reside in opulent apartments, shielded from the grit of the lower districts by a layer of privacy and security that few can penetrate. The district is a testament to technological advancement, where AI-controlled transportation systems glide smoothly along elevated tracks, and holographic billboards advertise the latest in cutting-edge technology. However, beneath this facade of prosperity lies an undercurrent of unrest, as the widening gap between rich and poor continues to fuel discontent among the city's marginalized population.",
+    "_sources": [
+      "doc#8 Major Districts of the Overworld Nexus"
+    ]
+  },
+  {
+    "world": "Overworld Nexus",
+    "kind": "lore",
+    "title": "Research Sector",
+    "status": "proposed",
+    "created_by": "woven:ollama",
+    "tags": [
+      "woven",
+      "proposed",
+      "needs-review"
+    ],
+    "body": "The Research Sector of the Overworld Nexus is a labyrinthine district dedicated to scientific experimentation and technological innovation. It houses numerous research facilities, workshops, and prototype labs where cutting-edge technology is developed and tested. The sector's reputation as a breeding ground for forbidden tech stems from its lenient regulations towards unconventional research and development.\n\nThe district is characterized by its industrial architecture, with towering spires of steel and glass interspersed with dilapidated warehouses. Narrow alleys and hidden passages wind between the buildings, concealing clandestine operations and illicit activities. The sector's inhabitants are a diverse mix of scientists, engineers, technicians, and entrepreneurs, all driven by the pursuit of knowledge and profit.\n\nDespite its potential for groundbreaking discoveries, the Research Sector remains shrouded in controversy due to the ethical implications of some of the research conducted within its boundaries. Unconfirmed reports suggest that unscrupulous corporations and rogue researchers exploit vulnerable populations for their experiments, fueling calls for increased oversight and regulation.",
+    "_sources": [
+      "doc#8 Major Districts of the Overworld Nexus"
+    ]
+  },
+  {
+    "world": "Overworld Nexus",
+    "kind": "lore",
+    "title": "Remote Overlays",
+    "status": "proposed",
+    "created_by": "woven:ollama",
+    "tags": [
+      "woven",
+      "proposed",
+      "needs-review"
+    ],
+    "body": "In the sprawling labyrinth of the Nexus, mobility is facilitated by Remote Overlays and Network Linking. These digital constructs allow for seamless transition between physical locations, blurring boundaries as data streams intertwine with the corporeal realm. The overlays are intricate webs of information threads, woven into the fabric of the cityscape, enabling instantaneous transit across vast distances. However, their reliance on network stability and security makes them a prime target for disruption and manipulation, heightening the constant struggle for control within this gritty, interconnected urban landscape.",
+    "_sources": [
+      "doc#12 Traversal and Network Overlays"
+    ]
+  },
+  {
+    "world": "Overworld Nexus",
+    "kind": "lore",
+    "title": "Network Linking",
+    "status": "proposed",
+    "created_by": "woven:ollama",
+    "tags": [
+      "woven",
+      "proposed",
+      "needs-review"
+    ],
+    "body": "In the sprawling labyrinth of the Overworld Nexus, movement is not solely a matter of physical traversal. The interconnected digital networks that underpin this urban landscape are integral to mobility.\n\nNetwork Linking, a crucial facet, enables seamless transition between physical and digital realms. By establishing connections between various nodes, it allows for the seamless flow of data, resources, and even individuals. This intricate web of interlinked networks serves as a lifeline, ensuring the Nexus remains functional amidst its chaotic environment.\n\nHowever, these fragmentary records offer little insight into the inner workings or origins of Network Linking. Its creation, maintenance, and security are subjects of ongoing debate among network specialists and urban historians alike. The true extent of its reach within the Nexus remains unconfirmed, with some suggesting it extends beyond the physical boundaries of individual districts.",
+    "_sources": [
+      "doc#12 Traversal and Network Overlays"
+    ]
+  },
+  {
+    "world": "Overworld Nexus",
+    "kind": "lore",
+    "title": "Operator Interface",
+    "status": "proposed",
+    "created_by": "woven:ollama",
+    "tags": [
+      "woven",
+      "proposed",
+      "needs-review"
+    ],
+    "body": "The Operator Interface serves as a conduit within the Overworld Nexus, facilitating interaction between players and various entities. It functions as a hub for injecting intent, commands, and requests into the complex network of data streams that constitute the Nexus. While its exact design remains fragmentary in the available records, it is understood to be a crucial component, enabling control over the digital landscape. Its significance lies in bridging the gap between human intention and the intricate web of the Overworld Nexus.",
+    "_sources": [
+      "doc#7 The Layered Structure of the Overworld Nexus"
+    ]
+  }
+]
