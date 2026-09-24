@@ -139,8 +139,9 @@ status: proposed
     "Alongside its physical geography, the Nexus is composed of overlapping
      system layers. The Core handles processing and synchronization. The
      Mesh is the connective fabric of interactions between nodes. The
-     Operator Interface is where players and entities inject intent,
-     commands, and requests. Layers blend and bleed into one another."
+     Operator Interface is where operators and other entities inject
+     intent, commands, and requests. Layers blend and bleed into one
+     another."
 
   WHY STUB THEM AT ALL, NOW THAT doc#7 IS BACK: it gives each term a single
   clause. That is enough to retrieve on and not enough to play with. These
@@ -152,10 +153,26 @@ status: proposed
   Do that only once all three are written -- retiring it early takes the
   terms out of the world again, which is what happened on 2026-09-24.
 
-  ONE AUTHORING WARNING: doc#7 says the Operator Interface is where
-  "players" inject intent. Do not carry that word across. doc#2 establishes
-  that conversations are in-universe by default -- in-world canon should not
-  know the word player. Say operators, or whoever is holding the interface.
+  VOCABULARY RULE, which doc#7 used to break: it said the Operator Interface
+  was where "players" inject intent. Changed to "operators and other
+  entities" on 2026-09-24 -- and the term scored BETTER afterwards, 0.672 to
+  0.700, because "operators" reinforces the name instead of sitting outside
+  the fiction.
+
+  doc#2 establishes that conversations are in-universe by default, so
+  in-world canon should not know the word player. Say operators, avatars, or
+  whoever is holding the interface.
+
+  The word survives in seven other documents, five of them yours. Most are
+  legitimate -- rules and voice docs are written TO the system, not from
+  inside the world. Two are worth a look, because they read as in-world
+  description and still say it:
+
+    doc#16  "where avatars, daemons and players negotiate influence"
+    doc#22  "Players are not visiting a static setting."
+
+  Everything retrieved gets injected as archive context, so a rules doc
+  pulled mid-scene can still leak its register into a reply.
 -->
 
 ## Core
