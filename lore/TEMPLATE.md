@@ -256,7 +256,11 @@ Withheld from retrieval. Tone and texture references for authoring only;
 no names, works, or coined terms from these may appear in world-facing
 canon.
 
-Renames still outstanding before anything using them can be seeded active:
-Ono-Sendai (Gibson) and braindance (2077) need native Nexus replacements.
-New Eridu is Zenless Zone Zero and must not be used at all. Note that the
-Dreamlink stub in canon/locations.json is currently tagged `braindance`.
+Renames completed 2026-09-24. Ono-Sendai (Gibson) is now Meridian
+Shellworks, the megacorporation behind M.A.I.D. suits. Braindance (2077) is
+now Driftwave — it was in use here as a music genre beside Neurosonic Techno
+and Neurofunk, not as the sensory-playback tech, so a genre-shaped name in
+house vocabulary was the fit.
+
+Still barred: New Eridu is Zenless Zone Zero and must not be used at all.
+Avoid stack and sleeve in the Altered Carbon sense — say shell and ghost.

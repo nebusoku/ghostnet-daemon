@@ -59,8 +59,8 @@
     "title": "Dreamlink",
     "status": "proposed",
     "created_by": "derived:channel-structure",
-    "tags": ["location", "mesh", "braindance", "stub"],
-    "body": "A mesh space rather than a physical one.\n\nSTUB — derived from the #dreamlink channel. Likely connects to Braindance and the Neurosonic material, and possibly to the low-power shell practices of the Cygnus, but nothing authored confirms this. Confirm or replace."
+    "tags": ["location", "mesh", "driftwave", "stub"],
+    "body": "A mesh space rather than a physical one.\n\nSTUB — derived from the #dreamlink channel. Likely connects to Driftwave and the Neurosonic material, and possibly to the low-power shell practices of the Cygnus, but nothing authored confirms this. Confirm or replace."
   },
   {
     "world": "Overworld Nexus",
