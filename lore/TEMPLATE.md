@@ -105,6 +105,80 @@ detail a player would still remember after visiting once.
 Change status to active once it is settled.
 
 
+# Architecture
+kind: tech
+status: proposed
+
+<!--
+  ===================================================================
+  These three lost their only source. Authoring them restores them.
+  ===================================================================
+
+  Core, Mesh and Operator Interface were defined in exactly one place:
+  doc#7, retired 2026-09-24 because its layer model contradicted doc#16.
+  Retiring it took all three terms out of the world. They now retrieve
+  nothing -- "what is the Operator Interface" returns a shell-augmentation
+  doc at 0.585, which is simply the nearest unrelated thing.
+
+  doc#7 in full, so you are not authoring from memory. The SQL row is the
+  only place this text still exists:
+
+    "The Nexus is composed of overlapping layers rather than fixed linear
+     geography. The Core handles processing and synchronization. The Mesh
+     is the connective fabric of interactions between nodes. The Operator
+     Interface is where players and entities inject intent, commands, and
+     requests. Layers blend and bleed into one another."
+
+  THE OPEN QUESTION: did doc#7 and doc#16 actually conflict?
+
+    doc#16 (authored)  surface / buried / signal-layer   physical strata
+    doc#7  (imported)  Core / Mesh / Operator Interface  system components
+
+  Those may be two axes rather than two answers -- where your body is,
+  versus how the network is built. doc#7 staked a stronger claim than that,
+  opening by denying "fixed linear geography" outright, which is what put
+  it in conflict. Nothing stops you ruling that both are true at once, on
+  different axes. That ruling would make doc#7 restorable rather than
+  replaced:  retire_doc.py restore --id 7 --apply
+
+  ONE AUTHORING WARNING: doc#7 says the Operator Interface is where
+  "players" inject intent. Do not carry that word across. doc#2 establishes
+  that conversations are in-universe by default -- in-world canon should not
+  know the word player. Say operators, or whoever is holding the interface.
+-->
+
+## Core
+tags: architecture, core
+
+STUB. The records establish only this: the Core handles processing and
+synchronization.
+
+Worth pinning down: whether the Core is a place someone can physically
+reach or purely an abstraction, who or what administers it, and what
+happens to the rest of the Nexus when it degrades.
+
+## Mesh
+tags: architecture, mesh
+
+STUB. The records establish only this: the Mesh is the connective fabric
+of interactions between nodes.
+
+Worth pinning down: how it relates to the signal-layer in doc#16 — whether
+they are the same thing under two names, which would be a third naming
+collision — and what the Circuit Choir mean when they say they listen to
+it.
+
+## Operator Interface
+tags: architecture, interface
+
+STUB. The records establish only this: the Operator Interface is where
+intent, commands and requests are injected into the Nexus.
+
+Worth pinning down: whether it is hardware, a practice, or a permission;
+what distinguishes an operator from anyone else; and whether the daemon
+sits behind it, in front of it, or is it.
+
+
 # Factions
 kind: faction
 
