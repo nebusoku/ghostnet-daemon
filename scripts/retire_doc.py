@@ -289,6 +289,22 @@ async def _edit(args, qc: QdrantClient) -> int:
     Body comes from a file, not an argument. Canon text is multi-paragraph
     and full of quotes and em dashes; passing it through a shell is how it
     gets mangled.
+
+    IF THE DOCUMENT CAME FROM canon/*.json, EDIT THE JSON TOO. Those files
+    are the seed source, and this tool only touches the live stores. Edit one
+    and not the other and they diverge silently -- the divergence only shows
+    up later, as a re-seed quietly reinstating the wording you removed.
+
+    The safe pattern is to change the JSON first and feed its text to this
+    command, so the two cannot disagree:
+
+        python -c "import json; print([x['body'] for x in
+          json.load(open('canon/foundation.json'))
+          if x['title'].startswith('Overworld Nexus')][0])" > /tmp/body.txt
+        python scripts/retire_doc.py edit --id 16 --body-file /tmp/body.txt --apply
+
+    Documents with created_by=discord-import are not in any canon file, so
+    for those the live store is the only copy.
     """
     new_body = args.body_file.read_text(encoding="utf-8").strip()
     if not new_body:
