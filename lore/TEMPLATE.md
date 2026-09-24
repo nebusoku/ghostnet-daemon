@@ -1,8 +1,8 @@
 <!--
   Authored lore for Overworld Nexus.
 
-  Import:  python scripts/import_lore.py lore/TEMPLATE.md -o canon/lore.json
-  Seed:    python scripts/seed_canon.py seed --only lore --apply
+  Import:  python3 scripts/import_lore.py lore/<file>.md -o canon/lore.json
+  Seed:    python3 scripts/seed_canon.py seed --only lore --apply
 
   Rules that matter for retrieval, not for prose:
 
@@ -10,68 +10,125 @@
      subject. 60-200 words is the sweet spot; the importer warns below 40
      and above 450.
   2. Put the searchable term in the heading. Retrieval and the gap detector
-     both key on titles, so "Spire District" beats "The Towers Above".
+     both key on titles, so "Central Spire" beats "The Tower Above".
   3. Metadata goes directly under the heading, no blank line between.
      Recognised: kind, status, tags, world, created_by.
-  4. Real-world influences go under `status: gm-only`. Those are withheld
+  4. status defaults to `active`, which means SETTLED TRUTH. Anything you
+     have not actually decided yet must carry `status: proposed`, or the
+     stub text gets seeded and retrieved as canon.
+  5. Real-world influences go under `status: gm-only`. Those are withheld
      from retrieval so the daemon cannot cite them in-world.
-  5. Write CONFLICT into the body rather than resolving a contradiction by
+  6. Write CONFLICT into the body rather than resolving a contradiction by
      guesswork. Guesswork is how the corpus got poisoned the first time.
+
+  These comments are stripped on import. Notes to yourself are free.
 -->
+
+
+<!--
+  ===================================================================
+  GEOGRAPHY IS UNRESOLVED. Read before writing any location entry.
+  ===================================================================
+
+  Two district maps exist and they contradict each other.
+
+  SET A -- doc#8 "Major Districts", created_by=discord-import, 2026-01-12.
+  Currently ACTIVE and live in Qdrant, so this is what the daemon answers
+  with today:
+      Spire District . Undercroft . Research Sector
+
+  SET B -- canon/locations.json, 8 stubs, status=proposed, NEVER SEEDED.
+  Derived from your actual Discord channel structure, so this is where
+  players are physically standing:
+      Central Spire . Reflection District . The Undercircuit
+      Street Level . Neon Lounge . Market Loop . Dreamlink . City Signal
+
+  Collisions:
+      Spire District (A)  ==  Central Spire (B)      same place, two names
+      Undercroft     (A)  ==  The Undercircuit (B)   same place, two names
+      Research Sector(A)  ==  --                     no channel exists
+      --                  ==  Reflection District(B) absent from doc#8
+
+  Provenance worth knowing: locations.json records that the daemon invented
+  "Undercroft" on 2026-01-03, nine days BEFORE the 2026-01-12 import that
+  put doc#8 into canon. doc#8 is not in your `authored` batch (those are
+  docs #16-27, September). A daemon coinage may have been laundered into
+  active canon through that import. Unproven, but the dates line up badly.
+
+  Two things nobody has ruled on:
+
+    - THE CIRCUIT CHOIR HAS NO TERRITORY. Apex Spire holds Central Spire,
+      the Reflection Syndics hold Reflection District, the third founding
+      power holds nothing on either map. The unclaimed Research Sector is
+      sitting right there.
+
+    - SET B MIXES THREE SCALES. Street Level, The Undercircuit and City
+      Signal are the *layers* from doc#7, not districts. Neon Lounge and
+      Market Loop are venues. Only Central Spire and Reflection District
+      are districts proper.
+
+  Whichever way you rule, doc#8 has to be rewritten or retired -- while it
+  stays active, it contradicts you on every retrieval.
+-->
+
 
 # Districts
 kind: location
+status: proposed
 
-## Spire District
-tags: spire, corporate, apex
+<!--
+  Heading names below are deliberately left for you to fill in. Do not
+  copy either name set until you have ruled; whichever you type here is
+  the one that becomes canon.
+-->
 
-STUB — needs authoring. What is actually up there besides altitude?
+## <district name>
+tags: district
 
-Known from canon: luxury, power, corporate towers. Apex Spire holds the
-upper stacks and measures status by altitude.
+STUB. Replace the heading with the name you are ruling canonical, then
+write the entry.
 
-Open questions worth answering here: how does someone without standing get
-in, what does the district do that the others cannot, and what is the one
-detail a player would remember after visiting once.
+Worth pinning down for each district: who holds it, how someone without
+standing gets in, what it does that no other district does, and the one
+detail a player would still remember after visiting once.
 
-## Research Sector
-tags: research, prototypes, forbidden-tech
-
-STUB — needs authoring.
-
-Known from canon: experimentation, prototypes, forbidden tech. District
-borders are semi-fluid and shift.
-
-## Undercroft
-tags: undercroft, smugglers, market
-
-STUB — needs authoring.
-
-Known from canon: smugglers, scavengers, illicit markets.
+Change status to active once it is settled.
 
 
-# Technology
-kind: tech
+# Factions
+kind: faction
 
-## Network Linking
-tags: mobility, mesh
+<!--
+  A worked example of the target shape -- uncontested subject, so it does
+  not prejudge the geography. This is roughly the length and register to
+  aim for. Delete it once you have your own entries.
+-->
 
-STUB — needs authoring. Currently the only source is a single line about
-mobility being partly digital.
+## Circuit Choir
+status: active
+tags: choir, faction, mesh
 
-Worth pinning down: is this transit, telepresence, or identity projection,
-and what does it cost the person doing it.
+The Circuit Choir are network mystics and signal interpreters who treat
+the mesh as a living chorus.
+
+Where Apex Spire hears data, the Choir hears voice. They read drift, noise
+and packet loss as utterance rather than error, and they are the only
+faction that treats GhostNet as something to be listened to rather than
+used.
+
+One of the three founding powers of the Overworld Nexus.
 
 
 # Characters
 kind: npc
+status: proposed
 
 ## Eris
 tags: eris, contested
 
-CONFLICT — unresolved. Eris appears in play as a significant figure but
-the records disagree on what she is. Needs a ruling before this becomes
-active canon.
+CONFLICT — unresolved. Eris appears in play as a significant figure, and
+in canon twice: doc#5 (discord-import) and an emergent entry flagged
+CONTRADICTORY. The records disagree on what she is.
 
 Replace this body with the settled version, then change status to active.
 
@@ -87,6 +144,7 @@ Withheld from retrieval. Tone and texture references for authoring only;
 no names, works, or coined terms from these may appear in world-facing
 canon.
 
-Renames still outstanding: Ono-Sendai (Gibson) and braindance (2077) must
-be replaced with native Nexus terms before either can be seeded active.
-New Eridu is Zenless Zone Zero and must not be used at all.
+Renames still outstanding before anything using them can be seeded active:
+Ono-Sendai (Gibson) and braindance (2077) need native Nexus replacements.
+New Eridu is Zenless Zone Zero and must not be used at all. Note that the
+Dreamlink stub in canon/locations.json is currently tagged `braindance`.
