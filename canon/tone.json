@@ -29,6 +29,15 @@
   {
     "world": "Overworld Nexus",
     "kind": "rule",
+    "title": "GM REFERENCE — how canon may change (NOT CANON, NOT RETRIEVABLE)",
+    "status": "gm-only",
+    "created_by": "authored",
+    "tags": ["gm-only", "reference", "visibility:gm", "do-not-retrieve", "tone"],
+    "body": "DO NOT SEED THIS DOCUMENT INTO THE RETRIEVAL COLLECTION.\n\nHow canon is allowed to change. This was the second half of doc#22, 'The world remembers', until 2026-09-24. It is a rule about maintaining the corpus, not a fact about the world, and it was retrievable — so the daemon could be handed the phrase 'consequence for canon' mid-scene and treat corpus governance as something a character might say.\n\nTHE WORLD CHANGES BY RECORDED EVENT, NOT BY RE-DESCRIPTION. A faction that takes root, merges, evolves or dies leaves a trace of having done so. Contradiction without an event is an error, not evolution.\n\nThis is the test to apply when play produces something that does not fit. Ask what happened to make it true. If there is an answer, record the event and let the contradiction stand as history. If there is no answer, it is drift, and drift is how the corpus got poisoned the first time.\n\nThe in-world half of the original document remains as doc#22, rewritten to say the same thing without naming the machinery."
+  },
+  {
+    "world": "Overworld Nexus",
+    "kind": "rule",
     "title": "GM REFERENCE — genre register (NOT CANON, NOT RETRIEVABLE)",
     "status": "gm-only",
     "created_by": "authored",
