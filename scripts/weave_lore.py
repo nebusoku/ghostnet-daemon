@@ -237,7 +237,7 @@ def cmd_gaps(args) -> None:
     with SessionLocal() as db:
         passages = gather(db)
         gaps = find_gaps(passages, defined_titles(db))
-    print(f"\n  {len(passages)} passages, {len(gaps)} undefined term(s) mentioned 2+ times\n")
+    print(f"\n  {len(passages)} passages, {len(gaps)} undefined term(s)\n")
     print(f"  {'term':<38}{'hits':>5}  appears in")
     for t, n, w in gaps[: args.limit]:
         print(f"  {t[:37]:<38}{n:>5}  {', '.join(w[:3])}")
