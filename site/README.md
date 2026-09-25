@@ -87,10 +87,13 @@ world-loop ingest is a pull from the VM's side, on its own timer.
 
 ## Content feeds (MySQL)
 
-> **Untested.** The security fixes above were verified in a container — 14
-> functional checks, migration output confirmed. Everything in *this* section
-> was written while the VPN to the VM was down, so it has not been linted or
-> run against a real MySQL. Treat it as a first draft until it has been.
+> **Verified.** 36 end-to-end checks pass against real Apache, real MySQL and
+> real HTTP — the `.htaccess` rules included, which a PHP built-in server
+> would have skipped. Reproduce on any host with Docker:
+>
+> ```
+> bash site/tests/run.sh
+> ```
 
 MySQL replaces the JSONL for feeds. Files were fine for capture; they are poor
 at cursors, concurrent writes, expiry and aggregation, which is all of what a

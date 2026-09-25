@@ -55,8 +55,9 @@ if (!is_array($data)) {
     out(400, ['ok' => false, 'error' => 'Bad JSON']);
 }
 
-$now = gmdate('Y-m-d H:i:s');
+$now = gmdate("Y-m-d H:i:s");
 $inserted = 0;
+$skipped  = 0;
 
 if (!empty($data['echoes']) && is_array($data['echoes'])) {
     try {
@@ -70,16 +71,28 @@ if (!empty($data['echoes']) && is_array($data['echoes'])) {
             }
             $body = isset($e['body']) ? trim((string) $e['body']) : '';
             if ($body === '') {
+                $skipped++;
                 continue;
             }
             $body = mb_substr($body, 0, 280);
             // Control characters would break the JSON the console reads.
             $body = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $body);
 
-            $ttl = isset($e['ttl_hours']) ? (int) $e['ttl_hours'] : 0;
-            $expires = $ttl > 0
-                ? gmdate('Y-m-d H:i:s', time() + $ttl * 3600)
-                : null;
+            // Absent ttl_hours means no expiry. A ttl_hours that is present
+            // but not positive is a caller bug -- and the dangerous reading
+            // is the permissive one: folding it into "no expiry" would take
+            // a request for a short or already-dead lifetime and silently
+            // turn it into permanent content on a public page. Refuse it and
+            // say so instead.
+            $expires = null;
+            if (array_key_exists('ttl_hours', $e)) {
+                $ttl = (int) $e['ttl_hours'];
+                if ($ttl <= 0) {
+                    $skipped++;
+                    continue;
+                }
+                $expires = gmdate('Y-m-d H:i:s', time() + $ttl * 3600);
+            }
 
             $weight = isset($e['weight']) ? (int) $e['weight'] : 1;
             $weight = max(1, min($weight, 255));
@@ -160,6 +173,10 @@ try {
 out(200, [
     'ok'        => true,
     'inserted'  => $inserted,
+    // Non-zero means the VM sent something malformed -- an empty body, or a
+    // ttl_hours that was not positive. Reported rather than swallowed so the
+    // pusher can notice it is dropping echoes.
+    'skipped'   => $skipped,
     'pruned'    => $pruned,
     'published' => $published,
 ]);
