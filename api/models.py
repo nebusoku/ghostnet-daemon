@@ -214,3 +214,53 @@ class WorldEvent(Base):
 
     occurred_at = Column(DateTime, default=utcnow, index=True)
     created_by = Column(String, nullable=True)   # daemon / gm / system
+
+
+class SiteSignal(Base):
+    """
+    Something a stranger typed into the website's hidden console.
+
+    This is the site-to-world half of the leak loop. It is deliberately NOT a
+    WorldDocument, and nothing here is ever embedded into the retrieval
+    collection.
+
+    The reason is the corpus's own history. Qdrant once held twelve
+    bot-authored self-quotes, including "I'm just a large language model",
+    retrievable alongside curated canon and indistinguishable from it once
+    scored. That poison came from the daemon quoting itself. This channel is
+    strictly worse: unauthenticated text from the open internet, typed by
+    people with no stake in the world -- the existing log contains "help",
+    "hello", and someone typing "fuck" at it -- and it is exactly the surface
+    a prompt injection would arrive on.
+
+    So signals land here, screened, and stop. A signal becomes world material
+    only by a deliberate, separate act: promotion into a WorldEvent or a canon
+    document, with a human deciding. Seed a ruling, never the deliberation.
+
+    `remote_id` is the site's own auto-increment. It is unique here, which
+    makes re-ingesting a range harmless, and MAX(remote_id) serves as the
+    watermark so there is no cursor state to drift out of sync.
+    """
+    __tablename__ = "site_signals"
+
+    id = Column(Integer, primary_key=True, index=True)
+    remote_id = Column(Integer, unique=True, nullable=False, index=True)
+
+    occurred_at = Column(DateTime, index=True)   # when it was typed, per the site
+    visitor = Column(String, index=True)         # salted HMAC, never an address
+    client = Column(String, nullable=True)       # coarse label, not a user agent
+    page = Column(String, nullable=True, index=True)
+    message = Column(Text, nullable=False)
+
+    # Guard result at ingest. "clean", or the probe category that fired
+    # (math / injection / model_probe / utility). Recorded rather than
+    # discarded: what strangers try on the console is itself worth seeing,
+    # and a rash of injection attempts is a thing the GM should notice.
+    screened = Column(String, default="clean", nullable=False, index=True)
+
+    # new -> nothing has been done with it
+    # used -> promoted into world material
+    # rejected -> read and deliberately discarded
+    status = Column(String, default="new", nullable=False, index=True)
+
+    ingested_at = Column(DateTime, default=utcnow, index=True)

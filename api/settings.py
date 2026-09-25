@@ -179,5 +179,18 @@ class Settings(BaseModel):
     chunk_size: int = int(os.getenv("CHUNK_SIZE", 1000))
     chunk_overlap: int = int(os.getenv("CHUNK_OVERLAP", 150))
 
+    # --- Site leak loop -----------------------------------------------------
+    # overworldnex.us is a different host on different hosting that this box
+    # cannot reach except over HTTPS, so every crossing is initiated here. The
+    # site never calls the VM: a visitor typing into the console must not wait
+    # on, or fail because of, a machine behind a VPN that drops.
+    site_feed_url: str = os.getenv("SITE_FEED_URL", "")
+    site_echo_url: str = os.getenv("SITE_ECHO_URL", "")
+    # Sent as X-Ghost-Key. Matches `feed_key` in the site's ghost_config.php.
+    site_feed_key: str = os.getenv("SITE_FEED_KEY", "")
+    # Rows per request. The site caps this at 500 regardless.
+    site_ingest_limit: int = int(os.getenv("SITE_INGEST_LIMIT", 200))
+    site_http_timeout: int = int(os.getenv("SITE_HTTP_TIMEOUT", 30))
+
 
 settings = Settings()
