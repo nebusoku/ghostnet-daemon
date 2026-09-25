@@ -63,6 +63,40 @@ if (mb_strlen($message) > 500) {
 // Control characters would corrupt the JSONL line the VM reads back.
 $message = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $message);
 
+// Which page the console was opened on. Referer is client-controlled, so it
+// is treated as a hint and clamped, never trusted.
+$page = null;
+if (is_array($data) && isset($data['page'])) {
+    $page = mb_substr(trim((string) $data['page']), 0, 190);
+} elseif (isset($_SERVER['HTTP_REFERER'])) {
+    $path = parse_url((string) $_SERVER['HTTP_REFERER'], PHP_URL_PATH);
+    $page = $path ? mb_substr($path, 0, 190) : null;
+}
+
+$ts = gmdate('Y-m-d H:i:s');
+$client = ghost_client_label();
+
+// Primary path: the database.
+$pdo = ghost_db($cfg);
+if ($pdo !== null) {
+    try {
+        $st = $pdo->prepare(
+            'INSERT INTO signals (ts, visitor, client, page, message)
+             VALUES (?, ?, ?, ?, ?)'
+        );
+        $st->execute([$ts, $visitor, $client, $page, $message]);
+        echo json_encode(['ok' => true]);
+        exit;
+    } catch (PDOException $e) {
+        // Fall through to the file. Deliberately not fatal: the database
+        // being down should cost the world a little fidelity, not cost a
+        // visitor their message.
+    }
+}
+
+// Fallback: the same JSONL the database replaced. Whatever lands here can be
+// loaded later with migrate_log.php, so an outage delays ingestion rather
+// than losing it.
 $dir = isset($cfg['data_dir']) ? $cfg['data_dir'] : null;
 if (!$dir || !is_dir($dir)) {
     fail(503, 'Not configured');
@@ -78,7 +112,8 @@ if (is_file($logFile) && filesize($logFile) > 33554432) {
 $entry = [
     'ts'      => gmdate('Y-m-d\TH:i:s\Z'),
     'visitor' => $visitor,
-    'client'  => ghost_client_label(),
+    'client'  => $client,
+    'page'    => $page,
     'message' => $message,
 ];
 
@@ -95,4 +130,4 @@ if (flock($fh, LOCK_EX)) {
 fclose($fh);
 @chmod($logFile, 0600);
 
-echo json_encode(['ok' => true]);
+echo json_encode(['ok' => true, 'degraded' => true]);

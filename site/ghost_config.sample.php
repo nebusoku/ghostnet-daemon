@@ -50,9 +50,45 @@ return [
     'ip_salt' => 'REPLACE_ME',
 
     /**
-     * Where the log is written. Must be outside public_html.
+     * Where files are written. Must be outside public_html.
      * Created on first write if missing.
+     *
+     * Still used after the move to MySQL: it holds the pre-database JSONL log
+     * during migration, and is where a failed database write falls back to so
+     * that a visitor's message is never silently lost.
      */
     'data_dir' => __DIR__ . '/ghost_data',
+
+    /**
+     * Shared secret for the VM-facing endpoints, feed.php and echo.php.
+     *
+     * The VM sends it as an X-Ghost-Key header. A header rather than a query
+     * parameter, because query strings end up in access logs, Referer headers
+     * and browser history, and this one grants read access to everything
+     * visitors have typed.
+     *
+     *     php -r 'echo bin2hex(random_bytes(32)), "\n";'
+     *
+     * Different value from ip_salt. Reusing one secret for two purposes means
+     * rotating either forces rotating both, and rotating ip_salt makes every
+     * returning visitor look new.
+     */
+    'feed_key' => 'REPLACE_ME',
+
+    /**
+     * MySQL, created in hPanel. Load schema.sql into it once.
+     *
+     * The database is never exposed to the internet: only PHP on this host
+     * connects to it, and the VM reaches it through feed.php and echo.php
+     * over HTTPS. That survives the VM's public address changing, which
+     * matters because it sits behind a VPN.
+     */
+    'db' => [
+        'host'     => 'localhost',
+        'name'     => 'REPLACE_ME',
+        'user'     => 'REPLACE_ME',
+        'pass'     => 'REPLACE_ME',
+        'charset'  => 'utf8mb4',
+    ],
 
 ];

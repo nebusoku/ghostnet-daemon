@@ -85,6 +85,54 @@ world-loop ingest is a pull from the VM's side, on its own timer.
    pseudonym in the Visitor column — then send a message through the hidden
    console on any page and confirm it appears.
 
+## Content feeds (MySQL)
+
+> **Untested.** The security fixes above were verified in a container — 14
+> functional checks, migration output confirmed. Everything in *this* section
+> was written while the VPN to the VM was down, so it has not been linted or
+> run against a real MySQL. Treat it as a first draft until it has been.
+
+MySQL replaces the JSONL for feeds. Files were fine for capture; they are poor
+at cursors, concurrent writes, expiry and aggregation, which is all of what a
+feed needs.
+
+```
+schema.sql                 -> signals, echoes, traffic
+public_html/admin/
+  feed.php                 -> VM pulls signals since <id>
+  echo.php                 -> VM pushes echoes, regenerates echoes.json
+public_html/echoes.json    -> generated; the console reads this
+```
+
+**The VM never touches MySQL.** It talks to `feed.php` and `echo.php` over
+HTTPS with a shared secret in an `X-Ghost-Key` header. The database stays
+closed to the internet, and nothing breaks when the VM's public address
+changes — which matters, because it sits behind a VPN that drops.
+
+**`signals` has no consumed flag.** The VM keeps its own watermark and asks
+for everything after it, so the read path never writes, two pullers cannot
+race, and replaying a range is just a smaller `since`.
+
+**`echo.php` writes the row and regenerates a static `echoes.json`.** The
+database holds the structure — expiry, weight, scope, provenance — but a page
+load should never touch MySQL to find out what to whisper. If the VM goes
+quiet the echoes go stale, which reads as the mesh going quiet rather than as
+a broken page. The file is replaced atomically via `rename()`, so nobody is
+served a half-written one.
+
+`echoes.json` lives in `public_html/`, **not** in `admin/`, because the
+`.htaccess` there denies `*.json`. Moving it would take the echo half of the
+loop off the air silently.
+
+Setup: create the database in hPanel, load `schema.sql`, fill in the `db`
+section and `feed_key` in `ghost_config.php`, then run `migrate_log.php
+--apply` to load any existing JSONL into `signals`.
+
+`log.php` still falls back to the JSONL file if MySQL is unreachable, and
+`migrate_log.php` drains that file into the table — so a database outage
+delays ingestion rather than losing a visitor's message. That makes it safe
+to run on a schedule.
+
 ## Not done yet
 
 - **The `join/` invite is still `https://discord.gg/your-link-here`**, twice:

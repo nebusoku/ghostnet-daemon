@@ -9,6 +9,11 @@
 # future host or a misplaced copy of the log might not, and a data file that
 # is merely unlinked is still public.
 
+# Note: echoes.json is written to public_html/ deliberately, NOT here. It is
+# the one data file that is meant to be fetched — the console reads it on
+# every page load. Do not move it into /admin to "tidy up"; this rule would
+# silently take the echo half of the world loop off the air.
+
 <FilesMatch "\.(jsonl|json|log|db|sqlite3?)$">
     Require all denied
 </FilesMatch>

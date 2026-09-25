@@ -1,24 +1,26 @@
 <?php
 /**
- * Move the existing console log out of the web root and strip the addresses.
- *
- * Run once, on the server, after ghost_config.php exists:
+ * Load JSONL console logs into the signals table, scrubbing as it goes.
  *
  *     php scripts/migrate_log.php                 # report only
  *     php scripts/migrate_log.php --apply
  *
- * The old log holds real IP addresses and full user-agent strings, and it was
- * publicly fetchable. Relocating it is not enough on its own -- the file has
- * already been served, so the addresses in it should be treated as exposed
- * and replaced rather than merely hidden.
+ * Handles both files that can exist:
  *
- * Each `ip` becomes the same salted HMAC that log.php now writes, so history
- * and new entries agree: a visitor who appeared before the change and returns
- * afterwards resolves to one identity. The addresses are not recoverable from
- * the result.
+ *   public_html/admin/ghost_console_log.jsonl
+ *       The original. Holds raw `ip` and full `ua`, and was publicly
+ *       fetchable. Relocating it would not be enough — it has already been
+ *       served, so those addresses are exposed and are replaced rather than
+ *       hidden. Each `ip` becomes the same salted HMAC log.php now writes, so
+ *       a visitor from before the change and the same visitor afterwards
+ *       resolve to one identity.
  *
- * The original is left where it is. Delete it yourself once the output looks
- * right -- this script will not remove the only copy of anything.
+ *   <data_dir>/ghost_console_log.jsonl
+ *       The fallback log.php writes when MySQL is unreachable. Already
+ *       scrubbed; this drains it into the database so an outage delays
+ *       ingestion instead of losing it. Safe to run on a schedule.
+ *
+ * Neither source file is deleted. Check the table, then remove them yourself.
  */
 
 $root = dirname(__DIR__);
@@ -36,13 +38,10 @@ if ($salt === '' || $salt === 'REPLACE_ME') {
     fwrite(STDERR, "set ip_salt in ghost_config.php first\n");
     exit(1);
 }
-
-$old = $root . '/public_html/admin/ghost_console_log.jsonl';
-$new = rtrim($cfg['data_dir'], '/\\') . '/ghost_console_log.jsonl';
-
-if (!is_file($old)) {
-    echo "  nothing at $old -- already migrated?\n";
-    exit(0);
+$pdo = ghost_db($cfg);
+if ($pdo === null) {
+    fwrite(STDERR, "cannot reach the database -- check the db section and that schema.sql is loaded\n");
+    exit(1);
 }
 
 function client_label_from_ua($ua) {
@@ -61,51 +60,89 @@ function client_label_from_ua($ua) {
     return $mobile ? 'other-mobile' : 'other';
 }
 
-$lines = file($old, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-$out = [];
+$sources = [$root . '/public_html/admin/ghost_console_log.jsonl'];
+if (!empty($cfg['data_dir'])) {
+    // Guarded: data_dir is optional in the config, and rtrim(null) is
+    // deprecated on PHP 8.1+ — it would emit a warning into the output and
+    // then build a path rooted at "/".
+    $sources[] = rtrim($cfg['data_dir'], '/\\') . '/ghost_console_log.jsonl';
+}
+
+$pending = [];
 $addresses = [];
 $skipped = 0;
 
-foreach ($lines as $line) {
-    $e = json_decode($line, true);
-    if (!is_array($e)) { $skipped++; continue; }
+foreach ($sources as $path) {
+    if (!is_file($path)) {
+        printf("  (no file at %s)\n", $path);
+        continue;
+    }
+    $lines = file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    $n = 0;
+    foreach ($lines as $line) {
+        $e = json_decode($line, true);
+        if (!is_array($e)) { $skipped++; continue; }
 
-    if (isset($e['ip'])) {
-        $addresses[$e['ip']] = true;
-        $e['visitor'] = substr(hash_hmac('sha256', $e['ip'], $salt), 0, 16);
-        unset($e['ip']);
+        if (isset($e['ip'])) {
+            $addresses[$e['ip']] = true;
+            $visitor = substr(hash_hmac('sha256', $e['ip'], $salt), 0, 16);
+        } else {
+            $visitor = isset($e['visitor']) ? (string) $e['visitor'] : 'unknown';
+        }
+
+        $client = isset($e['ua'])
+            ? client_label_from_ua($e['ua'])
+            : (isset($e['client']) ? (string) $e['client'] : 'unknown');
+
+        // Stored as DATETIME; the JSONL carries an ISO-8601 Z timestamp.
+        $ts = isset($e['ts']) ? str_replace(['T', 'Z'], [' ', ''], $e['ts']) : gmdate('Y-m-d H:i:s');
+
+        $pending[] = [
+            $ts,
+            mb_substr($visitor, 0, 16),
+            mb_substr($client, 0, 24),
+            isset($e['page']) ? mb_substr((string) $e['page'], 0, 190) : null,
+            mb_substr((string) ($e['message'] ?? ''), 0, 500),
+        ];
+        $n++;
     }
-    if (isset($e['ua'])) {
-        $e['client'] = client_label_from_ua($e['ua']);
-        unset($e['ua']);
-    }
-    $out[] = json_encode(
-        ['ts' => $e['ts'] ?? '', 'visitor' => $e['visitor'] ?? 'unknown',
-         'client' => $e['client'] ?? 'unknown', 'message' => $e['message'] ?? ''],
-        JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
-    );
+    printf("  %-64s %d entries\n", basename(dirname($path)) . '/' . basename($path), $n);
 }
 
-printf("  %d entries, %d distinct addresses -> pseudonyms, %d unparseable\n",
-       count($out), count($addresses), $skipped);
-printf("  from : %s\n  to   : %s\n", $old, $new);
+printf("\n  %d rows to insert, %d raw addresses -> pseudonyms, %d unparseable\n",
+       count($pending), count($addresses), $skipped);
 
+$existing = (int) $pdo->query('SELECT COUNT(*) FROM signals')->fetchColumn();
+printf("  signals currently holds %d row(s)\n", $existing);
+
+if (!$pending) {
+    exit(0);
+}
 if (!$apply) {
-    echo "\n  DRY RUN -- re-run with --apply to write.\n";
+    echo "\n  DRY RUN -- re-run with --apply to insert.\n";
     exit(0);
 }
 
-$dir = dirname($new);
-if (!is_dir($dir) && !@mkdir($dir, 0700, true)) {
-    fwrite(STDERR, "cannot create $dir\n");
+$pdo->beginTransaction();
+try {
+    $st = $pdo->prepare(
+        'INSERT INTO signals (ts, visitor, client, page, message) VALUES (?, ?, ?, ?, ?)'
+    );
+    foreach ($pending as $row) {
+        $st->execute($row);
+    }
+    $pdo->commit();
+} catch (PDOException $e) {
+    $pdo->rollBack();
+    fwrite(STDERR, "insert failed, nothing written: " . $e->getMessage() . "\n");
     exit(1);
 }
-if (file_put_contents($new, implode(PHP_EOL, $out) . PHP_EOL, LOCK_EX) === false) {
-    fwrite(STDERR, "cannot write $new\n");
-    exit(1);
-}
-@chmod($new, 0600);
 
-printf("\n  wrote %s\n", $new);
-printf("  The original still exists at:\n    %s\n", $old);
-printf("  Check the new file, then delete it:\n    rm %s\n", $old);
+$after = (int) $pdo->query('SELECT COUNT(*) FROM signals')->fetchColumn();
+printf("\n  inserted %d row(s); signals now holds %d\n", count($pending), $after);
+echo "  Source files were NOT deleted. Check the table, then remove them:\n";
+foreach ($sources as $path) {
+    if (is_file($path)) {
+        printf("    rm %s\n", $path);
+    }
+}
