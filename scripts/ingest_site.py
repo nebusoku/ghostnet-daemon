@@ -62,11 +62,12 @@ def _require_config() -> tuple:
     url = (settings.site_feed_url or "").strip()
     key = (settings.site_feed_key or "").strip()
     if not url or not key:
-        sys.exit(
-            "SITE_FEED_URL and SITE_FEED_KEY must be set.\n"
-            "  Add them to /etc/default/ghostnet-api, then:\n"
-            "    set -a && . /etc/default/ghostnet-api && set +a"
-        )
+        # Exit 0, not 1. This runs on a timer, and "the site is not wired up
+        # yet" is a state rather than a failure -- exiting non-zero would put
+        # a failed unit in the journal every ten minutes until deployment.
+        print("  SITE_FEED_URL / SITE_FEED_KEY not set -- nothing to do.")
+        print("  Set them in /etc/default/ghostnet-api to enable the loop.")
+        raise SystemExit(0)
     low = url.lower()
     loopback = low.startswith(("http://127.0.0.1", "http://localhost", "http://[::1]"))
     if not low.startswith("https://") and not loopback:

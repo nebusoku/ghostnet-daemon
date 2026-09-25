@@ -57,10 +57,24 @@ if (!is_array($data)) {
 
 $now = gmdate("Y-m-d H:i:s");
 $inserted = 0;
-$skipped  = 0;
+$skipped   = 0;
+$duplicate = 0;
 
 if (!empty($data['echoes']) && is_array($data['echoes'])) {
     try {
+        // Is this fragment already live? The pusher selects at random from a
+        // fixed pool of canon sentences, so on a timer it will offer the same
+        // text again within days. Without this the table grows without bound
+        // and echoes.json fills with the same whisper repeated.
+        //
+        // Scoped to LIVE rows only, deliberately: once an echo has expired,
+        // re-pushing it is how a fragment comes back around, which is the
+        // rotation the site is supposed to have.
+        $dupe = $pdo->prepare(
+            'SELECT 1 FROM echoes
+              WHERE body = ? AND (expires_at IS NULL OR expires_at > ?)
+              LIMIT 1'
+        );
         $st = $pdo->prepare(
             'INSERT INTO echoes (created_at, expires_at, weight, scope, body, source)
              VALUES (?, ?, ?, ?, ?, ?)'
@@ -107,6 +121,12 @@ if (!empty($data['echoes']) && is_array($data['echoes'])) {
             $source = isset($e['source'])
                 ? mb_substr((string) $e['source'], 0, 64)
                 : null;
+
+            $dupe->execute([$body, $now]);
+            if ($dupe->fetchColumn()) {
+                $duplicate++;
+                continue;
+            }
 
             $st->execute([$now, $expires, $weight, $scope, $body, $source]);
             $inserted++;
@@ -177,6 +197,9 @@ out(200, [
     // ttl_hours that was not positive. Reported rather than swallowed so the
     // pusher can notice it is dropping echoes.
     'skipped'   => $skipped,
+    // Already live, so not re-inserted. Expected to be the common case once a
+    // timer is pushing from a fixed pool of canon sentences.
+    'duplicate' => $duplicate,
     'pruned'    => $pruned,
     'published' => $published,
 ]);

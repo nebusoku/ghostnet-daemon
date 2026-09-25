@@ -1,0 +1,44 @@
+[Unit]
+Description=GhostNet — pull console signals from overworldnex.us
+Documentation=file:///opt/ghostnet-daemon/site/README.md
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+
+# Adjust to match your deployment user
+User=ghostnet
+Group=ghostnet
+
+# Adjust to your install path (for this deployment: /home/jfitzgerald/ghostnet-daemon)
+WorkingDirectory=/opt/ghostnet-daemon
+
+# Carries SITE_FEED_URL, SITE_FEED_KEY, DATABASE_URL and the rest.
+# Read as an EnvironmentFile, NOT sourced by a shell -- systemd does not split
+# on spaces, so values like OPENROUTER_TITLE=Overworld Nexus are fine here and
+# must NOT be quoted the way a shell would need.
+EnvironmentFile=/etc/default/ghostnet-api
+
+ExecStart=/opt/ghostnet-daemon/.venv/bin/python scripts/ingest_site.py pull --apply
+
+# The script exits 0 when SITE_FEED_URL is unset, so this unit is safe to
+# enable before the website half is deployed -- it simply reports that there
+# is nothing to do.
+
+# Reaching a third-party host over HTTPS; a hung connection must not pile up
+# behind the next timer tick.
+TimeoutStartSec=120
+
+# It only ever reads the network and writes one Postgres table.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/opt/ghostnet-daemon
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target

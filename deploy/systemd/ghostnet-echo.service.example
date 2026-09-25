@@ -1,0 +1,45 @@
+[Unit]
+Description=GhostNet — push world fragments to overworldnex.us
+Documentation=file:///opt/ghostnet-daemon/site/README.md
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+
+# Adjust to match your deployment user
+User=ghostnet
+Group=ghostnet
+
+# Adjust to your install path
+WorkingDirectory=/opt/ghostnet-daemon
+
+EnvironmentFile=/etc/default/ghostnet-api
+
+# Three fragments per run, expiring after 72h, pruning what has already died.
+#
+# Sources are restricted to in-world document kinds by default -- see the
+# allowlist in push_echoes.py, which exists because the first dry run offered
+# to publish an age-policy line as an atmospheric whisper.
+#
+# Re-pushing an already-live fragment is a no-op: echo.php skips it and
+# reports it as a duplicate. That is the expected common case, because the
+# canon pool is finite and the selection is random.
+ExecStart=/opt/ghostnet-daemon/.venv/bin/python scripts/push_echoes.py push \
+    --from canon --count 3 --ttl 72 --prune --apply
+
+# Exits 0 when SITE_ECHO_URL is unset, so this is safe to enable early.
+
+TimeoutStartSec=120
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/opt/ghostnet-daemon
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target

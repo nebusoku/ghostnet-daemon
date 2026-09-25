@@ -1,0 +1,16 @@
+[Unit]
+Description=Push world fragments to overworldnex.us every 6 hours
+Documentation=file:///opt/ghostnet-daemon/site/README.md
+
+[Timer]
+# Slower than ingest on purpose. Echoes live 72h, so six-hourly keeps roughly
+# a dozen fragments in rotation without the same lines cycling visibly. The
+# site should feel like it drifts, not like it refreshes.
+OnBootSec=15min
+OnUnitActiveSec=6h
+
+RandomizedDelaySec=600
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -101,11 +101,11 @@ def _require_config() -> tuple:
     url = (settings.site_echo_url or "").strip()
     key = (settings.site_feed_key or "").strip()
     if not url or not key:
-        sys.exit(
-            "SITE_ECHO_URL and SITE_FEED_KEY must be set.\n"
-            "  Add them to /etc/default/ghostnet-api, then:\n"
-            "    set -a && . /etc/default/ghostnet-api && set +a"
-        )
+        # Exit 0, not 1 -- see the note in ingest_site.py. An unconfigured
+        # loop is a state, not a failure.
+        print("  SITE_ECHO_URL / SITE_FEED_KEY not set -- nothing to do.")
+        print("  Set them in /etc/default/ghostnet-api to enable the loop.")
+        raise SystemExit(0)
     low = url.lower()
     loopback = low.startswith(("http://127.0.0.1", "http://localhost", "http://[::1]"))
     if not low.startswith("https://") and not loopback:
@@ -243,10 +243,19 @@ def cmd_push(args) -> int:
         print(f"\n  refused: {data.get('error')}")
         return 1
 
-    print(f"\n  inserted {data.get('inserted')}, skipped {data.get('skipped')}, "
-          f"pruned {data.get('pruned')}, now publishing {data.get('published')}")
+    print(f"\n  inserted {data.get('inserted')}, "
+          f"already live {data.get('duplicate', 0)}, "
+          f"skipped {data.get('skipped')}, pruned {data.get('pruned')}, "
+          f"now publishing {data.get('published')}")
     if data.get("skipped"):
         print("  WARNING: the site dropped some echoes as malformed.")
+    if data.get("duplicate") and not data.get("inserted"):
+        # Not a problem in itself -- the canon pool is finite and selection is
+        # random, so a timer will keep re-offering live fragments. Worth
+        # saying out loud only when nothing new got through at all.
+        print("  Every fragment offered was already live. The pool may be "
+              "exhausted until some expire; try --count higher or a longer "
+              "gap between runs.")
     return 0
 
 

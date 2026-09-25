@@ -1,0 +1,19 @@
+[Unit]
+Description=Pull console signals from overworldnex.us every 10 minutes
+Documentation=file:///opt/ghostnet-daemon/site/README.md
+
+[Timer]
+# Ten minutes is generous for a handful of players: the usual result is one
+# HTTPS GET returning zero rows. The world hearing the site a few minutes
+# late costs nothing; hammering someone else's shared hosting does.
+OnBootSec=3min
+OnUnitActiveSec=10min
+
+# Spread the wake-up so ingest and echo never fire in the same instant.
+RandomizedDelaySec=60
+
+# Catch up once after downtime rather than replaying every missed interval.
+Persistent=true
+
+[Install]
+WantedBy=timers.target
