@@ -23,7 +23,24 @@
  * Neither source file is deleted. Check the table, then remove them yourself.
  */
 
-$root = dirname(__DIR__);
+// Locate the directory that CONTAINS public_html, rather than assuming this
+// script sits in scripts/. It gets run from wherever it was dropped -- beside
+// public_html after an unzip, or from the repo checkout -- and a wrong guess
+// here fails with a bare "file not found" that says nothing useful.
+$root = null;
+foreach ([dirname(__DIR__), __DIR__, dirname(dirname(__DIR__))] as $candidate) {
+    if (is_file($candidate . '/public_html/admin/_config.php')) {
+        $root = $candidate;
+        break;
+    }
+}
+if ($root === null) {
+    fwrite(STDERR,
+        "cannot find public_html/admin/_config.php relative to this script.\n" .
+        "Run it from the directory containing public_html, or from the repo\n" .
+        "checkout as scripts/migrate_log.php.\n");
+    exit(1);
+}
 require_once $root . '/public_html/admin/_config.php';
 
 $apply = in_array('--apply', $argv, true);
